@@ -6,15 +6,23 @@ import {
   Share2, 
   RefreshCw,
   BarChart3,
-  User
+  User,
+  Upload
 } from "lucide-react";
 
 interface HeaderProps {
   lastUpdated?: Date;
   totalRecords?: number;
+  onUploadClick: () => void;
+  hasRealData: boolean;
 }
 
-export function Header({ lastUpdated = new Date(), totalRecords = 0 }: HeaderProps) {
+export function Header({ 
+  lastUpdated = new Date(), 
+  totalRecords = 0,
+  onUploadClick,
+  hasRealData
+}: HeaderProps) {
   const formatLastUpdated = (date: Date) => {
     return date.toLocaleString('en-US', {
       month: 'short',
@@ -35,9 +43,16 @@ export function Header({ lastUpdated = new Date(), totalRecords = 0 }: HeaderPro
             </div>
             
             <div className="space-y-1">
-              <h1 className="text-3xl font-bold text-white">
-                Social Listening Dashboard
-              </h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-white">
+                  Social Listening Dashboard
+                </h1>
+                {!hasRealData && (
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                    Demo Mode
+                  </Badge>
+                )}
+              </div>
               <p className="text-white/80 text-lg">
                 Real Smart Analytics
               </p>
@@ -67,6 +82,16 @@ export function Header({ lastUpdated = new Date(), totalRecords = 0 }: HeaderPro
 
             {/* Action buttons */}
             <div className="flex items-center gap-2">
+              <Button
+                onClick={onUploadClick}
+                variant="ghost"
+                size="sm"
+                className="text-white hover:bg-white/20 border-white/30"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {hasRealData ? 'Replace Data' : 'Upload Data'}
+              </Button>
+              
               <Button
                 variant="ghost"
                 size="sm"

@@ -4,7 +4,10 @@ import { KPICards } from "@/components/Dashboard/KPICards";
 import { FilterControls } from "@/components/Dashboard/FilterControls";
 import { ChartsGrid } from "@/components/Dashboard/ChartsGrid";
 import { AIInsights } from "@/components/Dashboard/AIInsights";
+import { FileUploadDialog } from "@/components/FileUpload/FileUploadDialog";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { SocialMention } from "@/types/dashboard";
+import { toast } from "sonner";
 
 const Index = () => {
   const {
@@ -14,8 +17,12 @@ const Index = () => {
     isLoading,
     updateFilters,
     setTimeframe,
-    totalRecords
+    uploadData,
+    totalRecords,
+    hasRealData
   } = useDashboardData();
+
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 
   const handleFilterChange = (filterType: string, value: string) => {
     switch (filterType) {
@@ -45,11 +52,19 @@ const Index = () => {
     }
   };
 
+  // Handle data upload
+  const handleDataUpload = (newData: SocialMention[]) => {
+    uploadData(newData);
+    toast.success(`Successfully uploaded ${newData.length} records!`);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header 
         lastUpdated={new Date()} 
         totalRecords={totalRecords}
+        onUploadClick={() => setIsUploadDialogOpen(true)}
+        hasRealData={hasRealData}
       />
       
       <div className="container mx-auto px-6 pb-8">
@@ -81,6 +96,13 @@ const Index = () => {
           </div>
         </div>
       </div>
+
+      {/* File Upload Dialog */}
+      <FileUploadDialog
+        isOpen={isUploadDialogOpen}
+        onClose={() => setIsUploadDialogOpen(false)}
+        onDataUploaded={handleDataUpload}
+      />
     </div>
   );
 };

@@ -4,7 +4,7 @@ import { mockData } from '@/utils/mockData';
 import { processKPIData, processChartData, filterData } from '@/utils/dataProcessing';
 
 export function useDashboardData() {
-  const [rawData] = useState<SocialMention[]>(mockData);
+  const [rawData, setRawData] = useState<SocialMention[]>(mockData);
   const [filters, setFilters] = useState<Partial<DashboardFilters>>({
     dateRange: {
       start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
@@ -88,6 +88,11 @@ export function useDashboardData() {
     });
   };
 
+  // Upload new data
+  const uploadData = (newData: SocialMention[]) => {
+    setRawData(newData);
+  };
+
   return {
     data: filteredData,
     kpiData,
@@ -96,6 +101,8 @@ export function useDashboardData() {
     isLoading,
     updateFilters,
     setTimeframe,
-    totalRecords: rawData.length
+    uploadData,
+    totalRecords: rawData.length,
+    hasRealData: rawData !== mockData
   };
 }
