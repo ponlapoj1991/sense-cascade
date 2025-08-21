@@ -15,8 +15,11 @@ import {
   TrendingUp,
   Users,
   Activity,
-  PieChart,
-  Download
+  MessageCircle,
+  Heart,
+  Share2,
+  Calendar,
+  Filter
 } from 'lucide-react';
 import { 
   PieChart as RechartsPieChart, 
@@ -31,7 +34,9 @@ import {
   YAxis,
   CartesianGrid,
   LineChart,
-  Line
+  Line,
+  AreaChart,
+  Area
 } from 'recharts';
 
 interface ExcelData {
@@ -46,12 +51,31 @@ interface ExcelData {
   };
 }
 
+interface SocialMediaData {
+  Url?: string;
+  date?: string | Date;
+  content?: string;
+  sentiment?: string;
+  Channel?: string;
+  content_type?: string;
+  total_engagement?: number;
+  username?: string;
+  Category?: string;
+  Sub_Category?: string;
+  type_of_speaker?: string;
+  Comment?: number;
+  Reactions?: number;
+  Share?: number;
+  [key: string]: any;
+}
+
 const DashboardWithExcel: React.FC = () => {
   const [excelData, setExcelData] = useState<ExcelData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSheet, setSelectedSheet] = useState<string>('');
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
+  const [dateFilter, setDateFilter] = useState<string>('all');
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -90,7 +114,25 @@ const DashboardWithExcel: React.FC = () => {
           const sheetData = jsonData.slice(1).map((row: any[]) => {
             const rowObj: Record<string, any> = {};
             sheetHeaders.forEach((header, index) => {
-              rowObj[header] = row[index] || '';
+              let value = row[index] || '';
+              
+              // Convert date strings to Date objects
+              if (header.toLowerCase().includes('date') && value) {
+                const dateValue = new Date(value);
+                if (!isNaN(dateValue.getTime())) {
+                  value = dateValue;
+                }
+              }
+              
+              // Convert numeric fields
+              if (['total_engagement', 'Comment', 'Reactions', 'Share'].includes(header)) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                  value = numValue;
+                }
+              }
+              
+              rowObj[header] = value;
             });
             return rowObj;
           });
@@ -128,6 +170,7 @@ const DashboardWithExcel: React.FC = () => {
     setExcelData(null);
     setSelectedSheet('');
     setError(null);
+    setDateFilter('all');
     if (fileInputRef) {
       fileInputRef.value = '';
     }
@@ -141,53 +184,140 @@ const DashboardWithExcel: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  // สร้างข้อมูลสำหรับ Charts
-  const chartData = useMemo(() => {
+  // Process social media analytics data
+  const socialMediaAnalytics = useMemo(() => {
     if (!excelData || !selectedSheet) return null;
 
-    const currentData = excelData.data[selectedSheet];
+    const currentData = excelData.data[selectedSheet] as SocialMediaData[];
     const headers = excelData.headers[selectedSheet];
 
     if (!currentData || currentData.length === 0) return null;
 
-    // สร้างข้อมูลสำหรับ Pie Chart (นับจำนวนในคอลัมน์แรก)
-    const firstColumn = headers[0];
-    const pieData = currentData.reduce((acc: Record<string, number>, row) => {
-      const value = row[firstColumn]?.toString() || 'ไม่ระบุ';
-      acc[value] = (acc[value] || 0) + 1;
+    // Filter by date if needed
+    let filteredData = currentData;
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const filterDate = new Date();
+      
+      switch (dateFilter) {
+        case '7days':
+          filterDate.setDate(now.getDate() - 7);
+          break;
+        case '30days':
+          filterDate.setDate(now.getDate() - 30);
+          break;
+        case '90days':
+          filterDate.setDate(now.getDate() - 90);
+          break;
+      }
+      
+      filteredData = currentData.filter(item => {
+        if (!item.date) return true;
+        const itemDate = new Date(item.date);
+        return itemDate >= filterDate;
+      });
+    }
+
+    // Sentiment Analysis
+    const sentimentData = filteredData.reduce((acc: Record<string, number>, item) => {
+      const sentiment = item.sentiment || 'Unknown';
+      acc[sentiment] = (acc[sentiment] || 0) + 1;
       return acc;
     }, {});
 
-    const pieChartData = Object.entries(pieData).map(([name, value]) => ({
+    const sentimentChartData = Object.entries(sentimentData).map(([name, value]) => ({
       name,
-      value,
-      percentage: ((value / currentData.length) * 100).toFixed(1)
+      value: Number(value),
+      percentage: ((Number(value) / filteredData.length) * 100).toFixed(1)
     }));
 
-    // สร้างข้อมูลสำหรับ Bar Chart (ถ้ามีคอลัมน์ตัวเลข)
-    const numericColumns = headers.filter(header => {
-      return currentData.some(row => {
-        const value = row[header];
-        return !isNaN(parseFloat(value)) && isFinite(value);
-      });
-    });
+    // Channel Analysis
+    const channelData = filteredData.reduce((acc: Record<string, number>, item) => {
+      const channel = item.Channel || 'Unknown';
+      acc[channel] = (acc[channel] || 0) + 1;
+      return acc;
+    }, {});
 
-    const barChartData = currentData.slice(0, 10).map((row, index) => {
-      const dataPoint: any = { name: `แถว ${index + 1}` };
-      numericColumns.forEach(col => {
-        dataPoint[col] = parseFloat(row[col]) || 0;
-      });
-      return dataPoint;
-    });
+    const channelChartData = Object.entries(channelData).map(([name, value]) => ({
+      name,
+      value: Number(value),
+      engagement: filteredData
+        .filter(item => item.Channel === name)
+        .reduce((sum, item) => sum + (Number(item.total_engagement) || 0), 0)
+    }));
+
+    // Category Analysis
+    const categoryData = filteredData.reduce((acc: Record<string, number>, item) => {
+      const category = item.Category || 'Unknown';
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {});
+
+    const categoryChartData = Object.entries(categoryData).map(([name, value]) => ({
+      name,
+      value: Number(value)
+    }));
+
+    // Timeline Analysis (by date)
+    const timelineData = filteredData.reduce((acc: Record<string, any>, item) => {
+      if (!item.date) return acc;
+      
+      const date = new Date(item.date);
+      const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      
+      if (!acc[dateKey]) {
+        acc[dateKey] = {
+          date: dateKey,
+          mentions: 0,
+          engagement: 0,
+          positive: 0,
+          negative: 0,
+          neutral: 0
+        };
+      }
+      
+      acc[dateKey].mentions += 1;
+      acc[dateKey].engagement += Number(item.total_engagement) || 0;
+      
+      const sentiment = item.sentiment?.toLowerCase() || 'neutral';
+      if (sentiment.includes('positive')) acc[dateKey].positive += 1;
+      else if (sentiment.includes('negative')) acc[dateKey].negative += 1;
+      else acc[dateKey].neutral += 1;
+      
+      return acc;
+    }, {});
+
+    const timelineChartData = Object.values(timelineData).sort((a: any, b: any) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // KPIs
+    const totalMentions = filteredData.length;
+    const totalEngagement = filteredData.reduce((sum, item) => sum + (Number(item.total_engagement) || 0), 0);
+    const avgEngagement = totalMentions > 0 ? totalEngagement / totalMentions : 0;
+    const uniqueUsers = new Set(filteredData.map(item => item.username)).size;
+    const positiveMentions = filteredData.filter(item => 
+      item.sentiment?.toLowerCase().includes('positive')
+    ).length;
+    const sentimentScore = totalMentions > 0 ? (positiveMentions / totalMentions) * 100 : 0;
 
     return {
-      pieChartData,
-      barChartData,
-      numericColumns
+      filteredData,
+      sentimentChartData,
+      channelChartData,  
+      categoryChartData,
+      timelineChartData,
+      kpis: {
+        totalMentions,
+        totalEngagement,
+        avgEngagement,
+        uniqueUsers,
+        sentimentScore
+      }
     };
-  }, [excelData, selectedSheet]);
+  }, [excelData, selectedSheet, dateFilter]);
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+  const COLORS = ['#22c55e', '#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#06b6d4'];
 
   const currentSheetData = selectedSheet && excelData ? excelData.data[selectedSheet] : [];
   const currentHeaders = selectedSheet && excelData ? excelData.headers[selectedSheet] : [];
@@ -198,14 +328,26 @@ const DashboardWithExcel: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Excel Dashboard</h1>
-            <p className="text-muted-foreground">อัปโหลดและวิเคราะห์ข้อมูล Excel</p>
+            <h1 className="text-3xl font-bold">Social Media Analytics Dashboard</h1>
+            <p className="text-muted-foreground">อัปโหลดและวิเคราะห์ข้อมูล Social Media Mentions</p>
           </div>
           {excelData && (
-            <Button onClick={handleRemoveFile} variant="outline" className="gap-2">
-              <X className="w-4 h-4" />
-              ล้างข้อมูล
-            </Button>
+            <div className="flex gap-2">
+              <select 
+                className="px-3 py-2 border rounded-md bg-background"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+              >
+                <option value="all">ข้อมูลทั้งหมด</option>
+                <option value="7days">7 วันล่าสุด</option>
+                <option value="30days">30 วันล่าสุด</option>
+                <option value="90days">90 วันล่าสุด</option>
+              </select>
+              <Button onClick={handleRemoveFile} variant="outline" className="gap-2">
+                <X className="w-4 h-4" />
+                ล้างข้อมูล
+              </Button>
+            </div>
           )}
         </div>
 
@@ -218,7 +360,9 @@ const DashboardWithExcel: React.FC = () => {
                 อัปโหลดไฟล์ Excel
               </CardTitle>
               <CardDescription>
-                รองรับไฟล์ .xlsx, .xls เพื่อนำเข้าข้อมูลสำหรับการวิเคราะห์
+                รองรับไฟล์ .xlsx, .xls ที่มีข้อมูล Social Media Mentions
+                <br />
+                คอลัมน์ที่รองรับ: Url, date, content, sentiment, Channel, content_type, total_engagement, username, Category, Sub_Category, type_of_speaker, Comment, Reactions, Share
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -262,7 +406,7 @@ const DashboardWithExcel: React.FC = () => {
         )}
 
         {/* Dashboard Content */}
-        {excelData && (
+        {excelData && socialMediaAnalytics && (
           <>
             {/* File Info */}
             <Card>
@@ -274,7 +418,7 @@ const DashboardWithExcel: React.FC = () => {
                     <p className="text-muted-foreground">
                       {formatFileSize(excelData.metadata.fileSize)} • 
                       {excelData.metadata.totalSheets} ชีต • 
-                      {excelData.metadata.totalRows} แถวข้อมูล
+                      {socialMediaAnalytics.filteredData.length} รายการ (จากทั้งหมด {excelData.metadata.totalRows} รายการ)
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -294,16 +438,16 @@ const DashboardWithExcel: React.FC = () => {
             </Card>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-blue-100 rounded-lg">
-                      <BarChart3 className="w-6 h-6 text-blue-600" />
+                      <MessageCircle className="w-6 h-6 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{currentSheetData.length}</p>
-                      <p className="text-muted-foreground text-sm">แถวข้อมูล</p>
+                      <p className="text-2xl font-bold">{socialMediaAnalytics.kpis.totalMentions.toLocaleString()}</p>
+                      <p className="text-muted-foreground text-sm">Total Mentions</p>
                     </div>
                   </div>
                 </CardContent>
@@ -313,11 +457,11 @@ const DashboardWithExcel: React.FC = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-green-100 rounded-lg">
-                      <Users className="w-6 h-6 text-green-600" />
+                      <Heart className="w-6 h-6 text-green-600" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{currentHeaders.length}</p>
-                      <p className="text-muted-foreground text-sm">คอลัมน์</p>
+                      <p className="text-2xl font-bold">{socialMediaAnalytics.kpis.totalEngagement.toLocaleString()}</p>
+                      <p className="text-muted-foreground text-sm">Total Engagement</p>
                     </div>
                   </div>
                 </CardContent>
@@ -327,11 +471,11 @@ const DashboardWithExcel: React.FC = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-purple-100 rounded-lg">
-                      <Activity className="w-6 h-6 text-purple-600" />
+                      <TrendingUp className="w-6 h-6 text-purple-600" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{excelData.metadata.totalSheets}</p>
-                      <p className="text-muted-foreground text-sm">ชีต</p>
+                      <p className="text-2xl font-bold">{Math.round(socialMediaAnalytics.kpis.avgEngagement)}</p>
+                      <p className="text-muted-foreground text-sm">Avg Engagement</p>
                     </div>
                   </div>
                 </CardContent>
@@ -341,150 +485,203 @@ const DashboardWithExcel: React.FC = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-orange-100 rounded-lg">
-                      <TrendingUp className="w-6 h-6 text-orange-600" />
+                      <Users className="w-6 h-6 text-orange-600" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{formatFileSize(excelData.metadata.fileSize)}</p>
-                      <p className="text-muted-foreground text-sm">ขนาดไฟล์</p>
+                      <p className="text-2xl font-bold">{socialMediaAnalytics.kpis.uniqueUsers.toLocaleString()}</p>
+                      <p className="text-muted-foreground text-sm">Unique Users</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-pink-100 rounded-lg">
+                      <Activity className="w-6 h-6 text-pink-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{socialMediaAnalytics.kpis.sentimentScore.toFixed(1)}%</p>
+                      <p className="text-muted-foreground text-sm">Positive Rate</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Charts and Data */}
-            <Tabs defaultValue="charts" className="space-y-6">
+            {/* Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Sentiment Analysis */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Sentiment Analysis</CardTitle>
+                  <CardDescription>การกระจายของ Sentiment</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsPieChart>
+                      <Pie
+                        data={socialMediaAnalytics.sentimentChartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {socialMediaAnalytics.sentimentChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: any) => [value, 'จำนวน']} />
+                      <Legend />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Channel Performance */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Channel Performance</CardTitle>
+                  <CardDescription>จำนวน Mentions แต่ละ Channel</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={socialMediaAnalytics.channelChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#3b82f6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Category Analysis */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Category Distribution</CardTitle>
+                  <CardDescription>การกระจายตาม Category</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={socialMediaAnalytics.categoryChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#10b981" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Timeline */}
+              {socialMediaAnalytics.timelineChartData.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Timeline Analysis</CardTitle>
+                    <CardDescription>แนวโน้มของ Mentions ตามเวลา</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <AreaChart data={socialMediaAnalytics.timelineChartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="date" 
+                          tickFormatter={(value) => new Date(value).toLocaleDateString('th-TH')}
+                        />
+                        <YAxis />
+                        <Tooltip 
+                          labelFormatter={(value) => new Date(value).toLocaleDateString('th-TH')}
+                        />
+                        <Area type="monotone" dataKey="mentions" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Data Table */}
+            <Tabs defaultValue="summary" className="space-y-6">
               <TabsList>
-                <TabsTrigger value="charts">กราฟและแผนภูมิ</TabsTrigger>
+                <TabsTrigger value="summary">สรุปข้อมูล</TabsTrigger>
                 <TabsTrigger value="data">ข้อมูลดิบ</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="charts" className="space-y-6">
-                {chartData && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Pie Chart */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>การกระจายข้อมูล</CardTitle>
-                        <CardDescription>
-                          แสดงการกระจายของข้อมูลในคอลัมน์ {currentHeaders[0]}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <RechartsPieChart>
-                            <Pie
-                              data={chartData.pieChartData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={60}
-                              outerRadius={100}
-                              paddingAngle={2}
-                              dataKey="value"
-                            >
-                              {chartData.pieChartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(value: any) => [value, 'จำนวน']} />
-                            <Legend />
-                          </RechartsPieChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
+              <TabsContent value="summary">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Top Categories</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {socialMediaAnalytics.categoryChartData.slice(0, 5).map((item, index) => (
+                          <div key={index} className="flex justify-between items-center">
+                            <span className="text-sm truncate">{item.name}</span>
+                            <Badge variant="outline">{item.value}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                    {/* Bar Chart */}
-                    {chartData.numericColumns.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>ข้อมูลตัวเลข</CardTitle>
-                          <CardDescription>
-                            แสดงข้อมูลตัวเลข 10 แถวแรก
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={chartData.barChartData}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" />
-                              <YAxis />
-                              <Tooltip />
-                              {chartData.numericColumns.slice(0, 3).map((column, index) => (
-                                <Bar 
-                                  key={column} 
-                                  dataKey={column} 
-                                  fill={COLORS[index % COLORS.length]} 
-                                />
-                              ))}
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                )}
-
-                {/* Data Summary */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>สรุปข้อมูลแต่ละคอลัมน์</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {currentHeaders.slice(0, 6).map((header, index) => {
-                        const uniqueValues = new Set(currentSheetData.map(row => row[header]?.toString() || ''));
-                        const hasNumericData = currentSheetData.some(row => {
-                          const value = row[header];
-                          return !isNaN(parseFloat(value)) && isFinite(value);
-                        });
-                        
-                        return (
-                          <div key={header} className="p-4 border rounded-lg">
-                            <h4 className="font-medium mb-2 truncate" title={header}>
-                              {header}
-                            </h4>
-                            <div className="space-y-1 text-sm text-muted-foreground">
-                              <p>ค่าที่ไม่ซ้ำ: {uniqueValues.size}</p>
-                              <p>ประเภท: {hasNumericData ? 'ตัวเลข' : 'ข้อความ'}</p>
-                              {uniqueValues.size <= 5 && (
-                                <div className="mt-2">
-                                  <p className="font-medium">ค่าที่พบ:</p>
-                                  {Array.from(uniqueValues).slice(0, 3).map((value, i) => (
-                                    <Badge key={i} variant="outline" className="mr-1 mb-1 text-xs">
-                                      {value.toString().slice(0, 10)}
-                                    </Badge>
-                                  ))}
-                                  {uniqueValues.size > 3 && <span className="text-xs">...</span>}
-                                </div>
-                              )}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Channel Performance</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {socialMediaAnalytics.channelChartData.slice(0, 5).map((item, index) => (
+                          <div key={index} className="flex justify-between items-center">
+                            <span className="text-sm truncate">{item.name}</span>
+                            <div className="text-right">
+                              <div className="text-sm font-medium">{item.value} mentions</div>
+                              <div className="text-xs text-muted-foreground">{item.engagement.toLocaleString()} engagement</div>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Sentiment Breakdown</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {socialMediaAnalytics.sentimentChartData.map((item, index) => (
+                          <div key={index} className="flex justify-between items-center">
+                            <span className="text-sm truncate">{item.name}</span>
+                            <div className="text-right">
+                              <div className="text-sm font-medium">{item.value}</div>
+                              <div className="text-xs text-muted-foreground">{item.percentage}%</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
 
-              <TabsContent value="data" className="space-y-6">
-                {/* Data Table */}
+              <TabsContent value="data">
                 <Card>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>ข้อมูลจากชีต: {selectedSheet}</CardTitle>
-                        <CardDescription>
-                          แสดงข้อมูล {Math.min(currentSheetData.length, 100)} แถวแรก จากทั้งหมด {currentSheetData.length} แถว
-                        </CardDescription>
-                      </div>
-                      <Button variant="outline" className="gap-2">
-                        <Download className="w-4 h-4" />
-                        Export CSV
-                      </Button>
-                    </div>
+                    <CardTitle>ข้อมูลจากชีต: {selectedSheet}</CardTitle>
+                    <CardDescription>
+                      แสดงข้อมูล {Math.min(socialMediaAnalytics.filteredData.length, 100)} แถวแรก 
+                      จากทั้งหมด {socialMediaAnalytics.filteredData.length} แถว
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {currentSheetData.length > 0 ? (
+                    {socialMediaAnalytics.filteredData.length > 0 ? (
                       <div className="overflow-auto max-h-[600px] border rounded-lg">
                         <table className="w-full text-sm">
                           <thead className="bg-muted/50 sticky top-0">
@@ -500,7 +697,7 @@ const DashboardWithExcel: React.FC = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {currentSheetData.slice(0, 100).map((row, rowIndex) => (
+                            {socialMediaAnalytics.filteredData.slice(0, 100).map((row, rowIndex) => (
                               <tr key={rowIndex} className="hover:bg-muted/50 border-b">
                                 <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
                                   {rowIndex + 1}
@@ -508,7 +705,10 @@ const DashboardWithExcel: React.FC = () => {
                                 {currentHeaders.map((header, colIndex) => (
                                   <td key={colIndex} className="px-4 py-3">
                                     <div className="truncate max-w-[200px]" title={row[header]?.toString() || ''}>
-                                      {row[header]?.toString() || '-'}
+                                      {row[header] instanceof Date 
+                                        ? row[header].toLocaleDateString('th-TH')
+                                        : row[header]?.toString() || '-'
+                                      }
                                     </div>
                                   </td>
                                 ))}
@@ -516,9 +716,9 @@ const DashboardWithExcel: React.FC = () => {
                             ))}
                           </tbody>
                         </table>
-                        {currentSheetData.length > 100 && (
+                        {socialMediaAnalytics.filteredData.length > 100 && (
                           <div className="p-4 text-center text-muted-foreground border-t bg-muted/20">
-                            แสดง 100 แถวแรก จากทั้งหมด {currentSheetData.length} แถว
+                            แสดง 100 แถวแรก จากทั้งหมด {socialMediaAnalytics.filteredData.length} แถว
                           </div>
                         )}
                       </div>
@@ -528,104 +728,6 @@ const DashboardWithExcel: React.FC = () => {
                         <p className="text-muted-foreground">ไม่พบข้อมูลในชีตนี้</p>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-
-                {/* Column Analysis */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>การวิเคราะห์คอลัมน์</CardTitle>
-                    <CardDescription>
-                      รายละเอียดเกี่ยวกับแต่ละคอลัมน์ในข้อมูล
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {currentHeaders.map((header, index) => {
-                        const columnData = currentSheetData.map(row => row[header]);
-                        const uniqueValues = new Set(columnData.map(val => val?.toString() || ''));
-                        const nullCount = columnData.filter(val => !val || val === '').length;
-                        const hasNumericData = columnData.some(val => !isNaN(parseFloat(val)) && isFinite(val));
-                        
-                        // คำนวณสถิติสำหรับข้อมูลตัวเลข
-                        let stats = null;
-                        if (hasNumericData) {
-                          const numericData = columnData
-                            .map(val => parseFloat(val))
-                            .filter(val => !isNaN(val));
-                          
-                          if (numericData.length > 0) {
-                            const min = Math.min(...numericData);
-                            const max = Math.max(...numericData);
-                            const avg = numericData.reduce((a, b) => a + b, 0) / numericData.length;
-                            stats = { min, max, avg };
-                          }
-                        }
-
-                        return (
-                          <div key={header} className="p-4 border rounded-lg space-y-3">
-                            <div className="flex items-center justify-between">
-                              <h4 className="font-medium">{header}</h4>
-                              <Badge variant={hasNumericData ? "default" : "secondary"}>
-                                {hasNumericData ? 'ตัวเลข' : 'ข้อความ'}
-                              </Badge>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                              <div>
-                                <p className="text-muted-foreground">ค่าทั้งหมด</p>
-                                <p className="font-medium">{columnData.length}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">ค่าที่ไม่ซ้ำ</p>
-                                <p className="font-medium">{uniqueValues.size}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">ค่าว่าง</p>
-                                <p className="font-medium">{nullCount}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">ข้อมูลครบ</p>
-                                <p className="font-medium">
-                                  {((columnData.length - nullCount) / columnData.length * 100).toFixed(1)}%
-                                </p>
-                              </div>
-                            </div>
-
-                            {stats && (
-                              <div className="grid grid-cols-3 gap-4 text-sm border-t pt-3">
-                                <div>
-                                  <p className="text-muted-foreground">ค่าต่ำสุด</p>
-                                  <p className="font-medium">{stats.min.toFixed(2)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-muted-foreground">ค่าเฉลี่ย</p>
-                                  <p className="font-medium">{stats.avg.toFixed(2)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-muted-foreground">ค่าสูงสุด</p>
-                                  <p className="font-medium">{stats.max.toFixed(2)}</p>
-                                </div>
-                              </div>
-                            )}
-
-                            {uniqueValues.size <= 10 && !hasNumericData && (
-                              <div className="border-t pt-3">
-                                <p className="text-sm text-muted-foreground mb-2">ค่าที่พบ:</p>
-                                <div className="flex flex-wrap gap-1">
-                                  {Array.from(uniqueValues).slice(0, 10).map((value, i) => (
-                                    <Badge key={i} variant="outline" className="text-xs">
-                                      {value.toString().slice(0, 20)}
-                                      {value.toString().length > 20 && '...'}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
