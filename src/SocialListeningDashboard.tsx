@@ -135,46 +135,6 @@ function DashboardContent() {
     }
   };
 
-  if (state.data.length === 0) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <Card className="w-full max-w-2xl">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl bg-gradient-primary bg-clip-text text-transparent">
-              Social Listening Dashboard
-            </CardTitle>
-            <p className="text-muted-foreground mt-2">
-              Upload your Excel data to get started with comprehensive social media analytics
-            </p>
-          </CardHeader>
-          <CardContent className="text-center space-y-6">
-            <div className="mx-auto w-24 h-24 bg-gradient-primary rounded-full flex items-center justify-center">
-              <FileSpreadsheet className="h-12 w-12 text-white" />
-            </div>
-            
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">What you'll get:</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="space-y-2">
-                  <p>✓ Sentiment Analysis & Trends</p>
-                  <p>✓ Channel Performance Metrics</p>
-                  <p>✓ Influencer Insights & Rankings</p>
-                </div>
-                <div className="space-y-2">
-                  <p>✓ Content Performance Analysis</p>
-                  <p>✓ Interactive Filtering & Drilling</p>
-                  <p>✓ Real-time Data Visualization</p>
-                </div>
-              </div>
-            </div>
-            
-            <FileUploadDialog onDataUpload={handleDataUpload} />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-h-screen bg-background w-full">
       {/* Sidebar */}
@@ -185,38 +145,38 @@ function DashboardContent() {
         {/* Header */}
         <header className="bg-card border-b border-border p-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-semibold">
-              {state.currentView === 'overview' && 'Dashboard Overview'}
-              {state.currentView === 'sentiment' && 'Sentiment Analysis'}
-              {state.currentView === 'performance' && 'Performance Metrics'}
-              {state.currentView === 'influencer' && 'Influencer Insights'}
-              {state.currentView === 'content' && 'Content Analysis'}
+            <h1 className="text-xl font-semibold bg-gradient-primary bg-clip-text text-transparent">
+              Social Listening Dashboard
             </h1>
-            <div className="text-sm text-muted-foreground">
-              {state.filteredData.length.toLocaleString()} of {state.data.length.toLocaleString()} mentions
-            </div>
+            {state.data.length > 0 && (
+              <div className="text-sm text-muted-foreground">
+                {state.filteredData.length.toLocaleString()} of {state.data.length.toLocaleString()} mentions
+              </div>
+            )}
           </div>
           
           <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className="relative"
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              Filters
-              {/* Filter count badge */}
-              {Object.values(state.filters).some(v => 
-                Array.isArray(v) ? v.length > 0 : 
-                typeof v === 'object' && v !== null ? Object.values(v).some(val => val !== null && val !== 0 && val !== Infinity) :
-                false
-              ) && (
-                <div className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-primary-foreground rounded-full text-xs flex items-center justify-center">
-                  !
-                </div>
-              )}
-            </Button>
+            {state.data.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                className="relative"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Filters
+                {/* Filter count badge */}
+                {Object.values(state.filters).some(v => 
+                  Array.isArray(v) ? v.length > 0 : 
+                  typeof v === 'object' && v !== null ? Object.values(v).some(val => val !== null && val !== 0 && val !== Infinity) :
+                  false
+                ) && (
+                  <div className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-primary-foreground rounded-full text-xs flex items-center justify-center">
+                    !
+                  </div>
+                )}
+              </Button>
+            )}
             
             <FileUploadDialog onDataUpload={handleDataUpload} />
           </div>
@@ -226,11 +186,43 @@ function DashboardContent() {
         <div className="flex-1 flex">
           {/* Main Content */}
           <div className="flex-1 overflow-auto">
-            {renderCurrentView()}
+            {state.data.length === 0 ? (
+              <div className="flex items-center justify-center h-full p-6">
+                <Card className="w-full max-w-2xl">
+                  <CardContent className="text-center space-y-6 p-8">
+                    <div className="mx-auto w-24 h-24 bg-gradient-primary rounded-full flex items-center justify-center">
+                      <FileSpreadsheet className="h-12 w-12 text-white" />
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <h2 className="text-2xl font-bold">Welcome to Social Listening Dashboard</h2>
+                      <p className="text-muted-foreground">
+                        Upload your Excel data to get started with comprehensive social media analytics
+                      </p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="space-y-2">
+                          <p>✓ Sentiment Analysis & Trends</p>
+                          <p>✓ Channel Performance Metrics</p>
+                          <p>✓ Influencer Insights & Rankings</p>
+                        </div>
+                        <div className="space-y-2">
+                          <p>✓ Content Performance Analysis</p>
+                          <p>✓ Interactive Filtering & Drilling</p>
+                          <p>✓ Real-time Data Visualization</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              renderCurrentView()
+            )}
           </div>
           
           {/* Filter Panel */}
-          {showFilters && (
+          {showFilters && state.data.length > 0 && (
             <div className="w-80 border-l border-border bg-card p-4 overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold">Filters</h2>

@@ -248,8 +248,8 @@ export function InfluencerView() {
                     </div>
                     
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {influencer.channels.slice(0, 3).map(channel => (
-                        <Badge key={channel} variant="secondary" className="text-xs">
+                      {influencer.channels.slice(0, 3).map((channel: string, index: number) => (
+                        <Badge key={`${channel}-${index}`} variant="secondary" className="text-xs">
                           {channel}
                         </Badge>
                       ))}
