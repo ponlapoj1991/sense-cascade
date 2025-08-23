@@ -33,7 +33,7 @@ export function ContentView() {
       }
       acc[type].count += 1;
       acc[type].totalEngagement += item.total_engagement || 0;
-      acc[type].channels.add(item.Channel);
+      acc[type].channels.add(item.channel);
       acc[type].sentiments[item.sentiment as keyof typeof acc[typeof type]['sentiments']] += 1;
       return acc;
     }, {} as Record<string, any>);
@@ -54,7 +54,7 @@ export function ContentView() {
     // Category content analysis
     const categoryContentData = Object.entries(
       filteredData.reduce((acc, item) => {
-        const category = item.Category || 'Unknown';
+        const category = item.category || 'Unknown';
         if (!acc[category]) {
           acc[category] = { count: 0, engagement: 0 };
         }
@@ -75,7 +75,7 @@ export function ContentView() {
     // Content performance by channel
     const channelContentData = Object.entries(
       filteredData.reduce((acc, item) => {
-        const channel = item.Channel || 'Unknown';
+        const channel = item.channel || 'Unknown';
         const contentType = item.content_type || 'Unknown';
         
         if (!acc[channel]) {
@@ -99,9 +99,9 @@ export function ContentView() {
       .map(item => ({
         ...item,
         engagementScore: (item.total_engagement || 0) + 
-          (item.Comment || 0) * 2 + 
-          (item.Reactions || 0) * 1.5 + 
-          (item.Share || 0) * 3
+          (item.comments || 0) * 2 + 
+          (item.reactions || 0) * 1.5 + 
+          (item.shares || 0) * 3
       }));
 
     // Content length analysis (if content available)
@@ -293,7 +293,7 @@ export function ContentView() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-sm font-medium">{content.username}</div>
                     <div className="flex items-center space-x-2">
-                      <Badge variant="outline">{content.Channel}</Badge>
+                      <Badge variant="outline">{content.channel}</Badge>
                       <Badge variant="secondary">{content.content_type}</Badge>
                     </div>
                   </div>
@@ -301,9 +301,9 @@ export function ContentView() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                       <span>{content.total_engagement?.toLocaleString()} engagement</span>
-                      <span>{content.Comment?.toLocaleString()} comments</span>
-                      <span>{content.Reactions?.toLocaleString()} reactions</span>
-                      <span>{content.Share?.toLocaleString()} shares</span>
+                      <span>{content.comments?.toLocaleString()} comments</span>
+                      <span>{content.reactions?.toLocaleString()} reactions</span>
+                      <span>{content.shares?.toLocaleString()} shares</span>
                     </div>
                     <Badge className={`text-xs ${
                       content.sentiment === 'Positive' ? 'bg-success' :

@@ -46,7 +46,7 @@ export function OverviewView() {
 
     // Channel distribution
     const channelCounts = filteredData.reduce((acc, item) => {
-      const channel = item.Channel || 'Unknown';
+      const channel = item.channel || 'Unknown';
       acc[channel] = {
         mentions: (acc[channel]?.mentions || 0) + 1,
         engagement: (acc[channel]?.engagement || 0) + (item.total_engagement || 0)
@@ -66,7 +66,7 @@ export function OverviewView() {
     // Category distribution
     const categoryData = Object.entries(
       filteredData.reduce((acc, item) => {
-        const category = item.Category || 'Unknown';
+        const category = item.category || 'Unknown';
         acc[category] = (acc[category] || 0) + 1;
         return acc;
       }, {} as Record<string, number>)

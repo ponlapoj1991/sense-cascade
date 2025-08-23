@@ -27,10 +27,10 @@ export function InfluencerView() {
       
       acc[username].mentions += 1;
       acc[username].totalEngagement += item.total_engagement || 0;
-      acc[username].channels.add(item.Channel);
+      acc[username].channels.add(item.channel);
       acc[username].sentiments[item.sentiment as keyof typeof acc[typeof username]['sentiments']] += 1;
       acc[username].contentTypes.add(item.content_type);
-      acc[username].categories.add(item.Category);
+      acc[username].categories.add(item.category);
       
       return acc;
     }, {} as Record<string, any>);
@@ -85,7 +85,7 @@ export function InfluencerView() {
     // Channel influence distribution
     const channelInfluenceData = Object.entries(
       filteredData.reduce((acc, item) => {
-        const channel = item.Channel || 'Unknown';
+        const channel = item.channel || 'Unknown';
         if (!acc[channel]) {
           acc[channel] = { users: new Set(), engagement: 0 };
         }

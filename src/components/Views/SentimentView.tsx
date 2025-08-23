@@ -35,7 +35,7 @@ export function SentimentView() {
 
     // Sentiment by channel
     const channelSentiment = filteredData.reduce((acc, item) => {
-      const channel = item.Channel || 'Unknown';
+      const channel = item.channel || 'Unknown';
       const sentiment = item.sentiment || 'Unknown';
       
       if (!acc[channel]) {
@@ -235,7 +235,7 @@ export function SentimentView() {
                 <div key={index} className="border-l-4 border-success pl-4">
                   <div className="text-sm font-medium">{mention.username}</div>
                   <div className="text-xs text-muted-foreground mb-1">
-                    {mention.Channel} • {mention.total_engagement?.toLocaleString()} engagement
+                    {mention.channel} • {mention.total_engagement?.toLocaleString()} engagement
                   </div>
                   <div className="text-sm line-clamp-2">{mention.content}</div>
                 </div>
@@ -254,7 +254,7 @@ export function SentimentView() {
                 <div key={index} className="border-l-4 border-destructive pl-4">
                   <div className="text-sm font-medium">{mention.username}</div>
                   <div className="text-xs text-muted-foreground mb-1">
-                    {mention.Channel} • {mention.total_engagement?.toLocaleString()} engagement
+                    {mention.channel} • {mention.total_engagement?.toLocaleString()} engagement
                   </div>
                   <div className="text-sm line-clamp-2">{mention.content}</div>
                 </div>

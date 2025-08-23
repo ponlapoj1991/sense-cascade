@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export function FilterPanel() {
-  const { state, addFilter, removeFilter, clearFilters } = useDashboard();
+  const { state, dispatch, addFilter, removeFilter, clearFilters } = useDashboard();
   const { data, filters } = state;
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     dates: true,
@@ -31,9 +31,9 @@ export function FilterPanel() {
   // Get unique values for filters
   const uniqueValues = {
     sentiments: [...new Set(data.map(item => item.sentiment).filter(Boolean))],
-    channels: [...new Set(data.map(item => item.Channel).filter(Boolean))],
-    categories: [...new Set(data.map(item => item.Category).filter(Boolean))],
-    subCategories: [...new Set(data.map(item => item.Sub_Category).filter(Boolean))],
+    channels: [...new Set(data.map(item => item.channel).filter(Boolean))],
+    categories: [...new Set(data.map(item => item.category).filter(Boolean))],
+    subCategories: [...new Set(data.map(item => item.sub_category).filter(Boolean))],
     contentTypes: [...new Set(data.map(item => item.content_type).filter(Boolean))],
     speakerTypes: [...new Set(data.map(item => item.type_of_speaker).filter(Boolean))],
     usernames: [...new Set(data.map(item => item.username).filter(Boolean))].slice(0, 50)
@@ -163,7 +163,16 @@ export function FilterPanel() {
                     <Calendar
                       mode="single"
                       selected={filters.dateRange.start || undefined}
-                      onSelect={(date) => addFilter('dateRange', { ...filters.dateRange, start: date })}
+                      onSelect={(date) => {
+                        if (date) {
+                          dispatch({
+                            type: 'SET_FILTERS',
+                            payload: {
+                              dateRange: { start: date, end: filters.dateRange.end }
+                            }
+                          });
+                        }
+                      }}
                       className="pointer-events-auto"
                     />
                   </PopoverContent>
@@ -182,7 +191,16 @@ export function FilterPanel() {
                     <Calendar
                       mode="single"
                       selected={filters.dateRange.end || undefined}
-                      onSelect={(date) => addFilter('dateRange', { ...filters.dateRange, end: date })}
+                      onSelect={(date) => {
+                        if (date) {
+                          dispatch({
+                            type: 'SET_FILTERS',
+                            payload: {
+                              dateRange: { start: filters.dateRange.start, end: date }
+                            }
+                          });
+                        }
+                      }}
                       className="pointer-events-auto"
                     />
                   </PopoverContent>

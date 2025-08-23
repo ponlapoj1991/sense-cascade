@@ -13,7 +13,7 @@ export function PerformanceView() {
   const performanceAnalytics = useMemo(() => {
     // Channel performance metrics
     const channelMetrics = filteredData.reduce((acc, item) => {
-      const channel = item.Channel || 'Unknown';
+      const channel = item.channel || 'Unknown';
       if (!acc[channel]) {
         acc[channel] = {
           mentions: 0,
@@ -26,9 +26,9 @@ export function PerformanceView() {
       
       acc[channel].mentions += 1;
       acc[channel].totalEngagement += item.total_engagement || 0;
-      acc[channel].comments += item.Comment || 0;
-      acc[channel].reactions += item.Reactions || 0;
-      acc[channel].shares += item.Share || 0;
+      acc[channel].comments += item.comments || 0;
+      acc[channel].reactions += item.reactions || 0;
+      acc[channel].shares += item.shares || 0;
       
       return acc;
     }, {} as Record<string, any>);
@@ -88,9 +88,9 @@ export function PerformanceView() {
         
         acc[dateStr].mentions += 1;
         acc[dateStr].engagement += item.total_engagement || 0;
-        acc[dateStr].comments += item.Comment || 0;
-        acc[dateStr].reactions += item.Reactions || 0;
-        acc[dateStr].shares += item.Share || 0;
+        acc[dateStr].comments += item.comments || 0;
+        acc[dateStr].reactions += item.reactions || 0;
+        acc[dateStr].shares += item.shares || 0;
         
         return acc;
       }, {} as Record<string, any>);
@@ -111,9 +111,9 @@ export function PerformanceView() {
     const totalMentions = filteredData.length;
     const totalEngagement = filteredData.reduce((sum, item) => sum + (item.total_engagement || 0), 0);
     const avgEngagement = totalMentions > 0 ? Math.round(totalEngagement / totalMentions) : 0;
-    const totalComments = filteredData.reduce((sum, item) => sum + (item.Comment || 0), 0);
-    const totalReactions = filteredData.reduce((sum, item) => sum + (item.Reactions || 0), 0);
-    const totalShares = filteredData.reduce((sum, item) => sum + (item.Share || 0), 0);
+    const totalComments = filteredData.reduce((sum, item) => sum + (item.comments || 0), 0);
+    const totalReactions = filteredData.reduce((sum, item) => sum + (item.reactions || 0), 0);
+    const totalShares = filteredData.reduce((sum, item) => sum + (item.shares || 0), 0);
 
     return {
       channelPerformanceData,
@@ -262,7 +262,7 @@ export function PerformanceView() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-sm font-medium">{post.username}</div>
                     <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                      <span>{post.Channel}</span>
+                      <span>{post.channel}</span>
                       <span>•</span>
                       <span>{post.content_type}</span>
                     </div>
@@ -275,15 +275,15 @@ export function PerformanceView() {
                     </div>
                     <div className="flex items-center space-x-1">
                       <MessageCircle className="h-3 w-3" />
-                      <span>{post.Comment?.toLocaleString()}</span>
+                      <span>{post.comments?.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Heart className="h-3 w-3" />
-                      <span>{post.Reactions?.toLocaleString()}</span>
+                      <span>{post.reactions?.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Share2 className="h-3 w-3" />
-                      <span>{post.Share?.toLocaleString()}</span>
+                      <span>{post.shares?.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>

@@ -34,22 +34,43 @@ function FileUploadDialog({ onDataUpload }: { onDataUpload: (data: any[]) => voi
       const rawData = XLSX.utils.sheet_to_json(worksheet);
 
       // Process and validate data
-      const processedData = rawData.map((row: any) => ({
-        Url: row.Url || row.URL || '',
-        date: row.date || row.Date || new Date(),
-        content: row.content || row.Content || '',
-        sentiment: row.sentiment || row.Sentiment || 'Neutral',
-        Channel: row.Channel || row.channel || '',
-        content_type: row.content_type || row['Content Type'] || row.contentType || '',
-        total_engagement: parseInt(row.total_engagement || row['Total Engagement'] || row.totalEngagement || '0'),
-        username: row.username || row.Username || row.user || '',
-        Category: row.Category || row.category || '',
-        Sub_Category: row.Sub_Category || row['Sub Category'] || row.subCategory || '',
-        type_of_speaker: row.type_of_speaker || row['Type of Speaker'] || row.speakerType || '',
-        Comment: parseInt(row.Comment || row.Comments || row.comment || '0'),
-        Reactions: parseInt(row.Reactions || row.reactions || row.Reaction || '0'),
-        Share: parseInt(row.Share || row.Shares || row.shares || '0')
-      }));
+      const processedData = rawData.map((row: any, index: number) => {
+        // Handle date conversion properly
+        let dateValue = row.date || row.Date;
+        if (dateValue) {
+          // If it's already a Date object, use it; otherwise parse it
+          if (dateValue instanceof Date) {
+            dateValue = dateValue.toISOString().split('T')[0];
+          } else if (typeof dateValue === 'string') {
+            // Try to parse the date string
+            const parsedDate = new Date(dateValue);
+            if (!isNaN(parsedDate.getTime())) {
+              dateValue = parsedDate.toISOString().split('T')[0];
+            } else {
+              dateValue = new Date().toISOString().split('T')[0];
+            }
+          }
+        } else {
+          dateValue = new Date().toISOString().split('T')[0];
+        }
+
+        return {
+          id: index + 1,
+          date: dateValue,
+          content: row.content || row.Content || '',
+          sentiment: (row.sentiment || row.Sentiment || 'Neutral') as 'Positive' | 'Negative' | 'Neutral',
+          channel: (row.Channel || row.channel || 'Website') as 'Facebook' | 'Website' | 'Twitter' | 'Instagram' | 'TikTok' | 'YouTube',
+          content_type: (row.content_type || row['Content Type'] || row.contentType || 'Post') as 'Post' | 'Video' | 'Comment' | 'Story',
+          total_engagement: parseInt(row.total_engagement || row['Total Engagement'] || row.totalEngagement || '0'),
+          username: row.username || row.Username || row.user || '',
+          category: (row.Category || row.category || 'Business Branding') as 'Business Branding' | 'ESG Branding' | 'Crisis Management',
+          sub_category: (row.Sub_Category || row['Sub Category'] || row.subCategory || 'Corporate') as 'Sport' | 'Stock' | 'Net zero' | 'Corporate',
+          type_of_speaker: (row.type_of_speaker || row['Type of Speaker'] || row.speakerType || 'Consumer') as 'Publisher' | 'Influencer voice' | 'Consumer' | 'Media',
+          comments: parseInt(row.Comment || row.Comments || row.comment || '0'),
+          reactions: parseInt(row.Reactions || row.reactions || row.Reaction || '0'),
+          shares: parseInt(row.Share || row.Shares || row.shares || '0')
+        };
+      });
 
       onDataUpload(processedData);
       setOpen(false);
