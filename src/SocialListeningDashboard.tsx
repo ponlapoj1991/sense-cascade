@@ -28,75 +28,38 @@ function FileUploadDialog({ onDataUpload }: { onDataUpload: (data: any[]) => voi
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, {
-        cellDates: true,
-        dateNF: 'yyyy-mm-dd'
-      });
+      const workbook = XLSX.read(arrayBuffer);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const rawData = XLSX.utils.sheet_to_json(worksheet, {
-        raw: false,
-        dateNF: 'yyyy-mm-dd'
-      });
+      const rawData = XLSX.utils.sheet_to_json(worksheet);
 
-      console.log('Raw data sample:', rawData.slice(0, 2));
-
-      // Process and validate data
       const processedData = rawData.map((row: any, index: number) => {
-        // Handle date conversion properly
         let dateValue = row.date || row.Date;
         
-        console.log(`Row ${index + 1} - Raw date:`, dateValue, 'Type:', typeof dateValue);
-
         if (dateValue !== null && dateValue !== undefined && dateValue !== '') {
-          // Handle Excel date serial number
-          if (typeof dateValue === 'number') {
-            // Excel date serial number to JS Date
-            const jsDate = new Date((dateValue - 25569) * 86400 * 1000);
-            if (!isNaN(jsDate.getTime())) {
-              dateValue = jsDate.toISOString().split('T')[0];
-            } else {
-              dateValue = new Date().toISOString().split('T')[0];
-            }
-          }
-          // Handle string dates
-          else if (typeof dateValue === 'string') {
-            let parsedDate;
-            
-            // Try YYYY/MM/DD format first
+          if (typeof dateValue === 'string') {
             if (dateValue.includes('/')) {
-              const parts = dateValue.split('/');
-              if (parts.length === 3) {
-                const year = parseInt(parts[0]);
-                const month = parseInt(parts[1]) - 1; // JS months are 0-based
-                const day = parseInt(parts[2]);
-                
-                if (year > 1900 && month >= 0 && month <= 11 && day >= 1 && day <= 31) {
-                  parsedDate = new Date(year, month, day);
-                }
+              const [year, month, day] = dateValue.split('/');
+              const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+              if (!isNaN(parsedDate.getTime())) {
+                dateValue = parsedDate.toISOString().split('T')[0];
+              } else {
+                dateValue = new Date().toISOString().split('T')[0];
+              }
+            } else {
+              const parsedDate = new Date(dateValue);
+              if (!isNaN(parsedDate.getTime())) {
+                dateValue = parsedDate.toISOString().split('T')[0];
+              } else {
+                dateValue = new Date().toISOString().split('T')[0];
               }
             }
-            // Try other formats
-            else {
-              parsedDate = new Date(dateValue);
-            }
-            
-            if (parsedDate && !isNaN(parsedDate.getTime())) {
-              dateValue = parsedDate.toISOString().split('T')[0];
-            } else {
-              console.warn('Invalid date format:', dateValue, 'for row:', index + 1);
-              dateValue = new Date().toISOString().split('T')[0];
-            }
-          }
-          // Handle Date objects
-          else if (dateValue instanceof Date) {
-            if (!isNaN(dateValue.getTime())) {
-              dateValue = dateValue.toISOString().split('T')[0];
-            } else {
-              dateValue = new Date().toISOString().split('T')[0];
-            }
-          }
-          else {
+          } else if (typeof dateValue === 'number') {
+            const jsDate = new Date((dateValue - 25569) * 86400 * 1000);
+            dateValue = jsDate.toISOString().split('T')[0];
+          } else if (dateValue instanceof Date) {
+            dateValue = dateValue.toISOString().split('T')[0];
+          } else {
             dateValue = new Date().toISOString().split('T')[0];
           }
         } else {
@@ -123,9 +86,6 @@ function FileUploadDialog({ onDataUpload }: { onDataUpload: (data: any[]) => voi
         return processedRow;
       });
 
-      console.log('Processed data sample:', processedData.slice(0, 2));
-      console.log('Total processed rows:', processedData.length);
-
       if (processedData.length === 0) {
         throw new Error('No valid data found in the Excel file');
       }
@@ -134,7 +94,6 @@ function FileUploadDialog({ onDataUpload }: { onDataUpload: (data: any[]) => voi
       setOpen(false);
       
     } catch (err) {
-      console.error('Excel processing error:', err);
       setError(`Failed to process Excel file: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsUploading(false);
@@ -193,12 +152,10 @@ function DashboardContent() {
   const [showFilters, setShowFilters] = useState(false);
 
   const handleDataUpload = (data: any[]) => {
-    console.log('Data received in handleDataUpload:', data.length, 'rows');
     dispatch({ type: 'SET_LOADING', payload: true });
     setTimeout(() => {
       dispatch({ type: 'SET_DATA', payload: data });
       dispatch({ type: 'SET_LOADING', payload: false });
-      console.log('Data set in context');
     }, 500);
   };
 
@@ -219,12 +176,9 @@ function DashboardContent() {
 
   return (
     <div className="flex min-h-screen bg-background w-full">
-      {/* Sidebar */}
       <Sidebar className="w-64 flex-shrink-0" />
       
-      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
         <header className="bg-card border-b border-border p-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h1 className="text-xl font-semibold bg-gradient-primary bg-clip-text text-transparent">
@@ -247,7 +201,6 @@ function DashboardContent() {
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Filters
-                {/* Filter count badge */}
                 {Object.values(state.filters).some(v => 
                   Array.isArray(v) ? v.length > 0 : 
                   typeof v === 'object' && v !== null ? Object.values(v).some(val => val !== null && val !== 0 && val !== Infinity) :
@@ -264,9 +217,7 @@ function DashboardContent() {
           </div>
         </header>
         
-        {/* Content Area */}
         <div className="flex-1 flex">
-          {/* Main Content */}
           <div className="flex-1 overflow-auto">
             {state.data.length === 0 ? (
               <div className="flex items-center justify-center h-full p-6">
@@ -303,7 +254,6 @@ function DashboardContent() {
             )}
           </div>
           
-          {/* Filter Panel */}
           {showFilters && state.data.length > 0 && (
             <div className="w-80 border-l border-border bg-card p-4 overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
