@@ -15,6 +15,7 @@ import { InfluencerView } from '@/components/Views/InfluencerView';
 import { ContentView } from '@/components/Views/ContentView';
 import { Upload, FileSpreadsheet, AlertCircle, Filter, X, CheckCircle } from 'lucide-react';
 import { SocialMention } from '@/types/dashboard';
+import { AIChatSidebar } from '@/components/Dashboard/AIChatSidebar';
 
 // ฟังก์ชันสำหรับประมวลผลข้อมูล Excel - FIXED!
 const processExcelData = (rawData: any[]): SocialMention[] => {
@@ -251,6 +252,7 @@ function FileUpload({ onDataUpload }: FileUploadProps) {
 function DashboardContent() {
   const { state, dispatch } = useDashboard();
   const [showFilters, setShowFilters] = useState(false);
+  const [showAISidebar, setShowAISidebar] = useState(false);
 
   const handleDataUpload = (data: SocialMention[]) => {
     console.log('📈 อัปโหลดข้อมูลเข้าสู่ระบบ:', data.length, 'รายการ');
@@ -336,7 +338,14 @@ function DashboardContent() {
                 )}
               </Button>
             )}
-            
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setShowAISidebar(true)}
+              className="bg-gradient-primary text-white"
+            >
+              AI วิเคราะห์
+            </Button>
             <FileUpload onDataUpload={handleDataUpload} />
           </div>
         </header>
@@ -400,6 +409,8 @@ function DashboardContent() {
               </div>
             </div>
           )}
+          {/* AI Chat Sidebar */}
+          <AIChatSidebar open={showAISidebar} onClose={() => setShowAISidebar(false)} />
         </div>
       </div>
     </div>
