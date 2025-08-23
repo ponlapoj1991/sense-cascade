@@ -6,17 +6,24 @@ import { Card } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
 import { useDashboard } from '@/contexts/DashboardContext';
 
-const OPENAI_API_KEY = "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";
+const OPENAI_API_KEY = "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";
 const OPENAI_MODEL = "gpt-4.1";
 const MAX_TOKENS = 20000;
 const TEMPERATURE = 0;
-const DEFAULT_AI_CONTEXT = 'คุณคือ AI ผู้ช่วยวิเคราะห์ข้อมูลบน Dashboard ตาม filter และข้อมูลที่เห็นขณะนี้ ให้คำตอบที่กระชับตามข้อมูลที่เห็น';
+const DEFAULT_AI_CONTEXT = 'คุณคือ AI ผู้ช่วยวิเคราะห์ข้อมูลบน Dashboard ตาม filter และข้อมูลที่เห็นขณะนี้';
 
 function getAIContextPrompt() {
   if (typeof window !== 'undefined') {
     return localStorage.getItem('ai_context_prompt') || DEFAULT_AI_CONTEXT;
   }
   return DEFAULT_AI_CONTEXT;
+}
+
+function getOpenAIApiKey() {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('openai_api_key') || '';
+  }
+  return '';
 }
 
 interface Message {
@@ -59,11 +66,17 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({ open, onClose }) =
     const contextPrompt = getAIContextPrompt();
     const dashboardContext = getDashboardContext();
     try {
+      const apiKey = getOpenAIApiKey();
+      if (!apiKey) {
+        setError('กรุณาตั้งค่า OpenAI API Key ในหน้า Setting ก่อนใช้งาน');
+        setLoading(false);
+        return;
+      }
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model: OPENAI_MODEL,
