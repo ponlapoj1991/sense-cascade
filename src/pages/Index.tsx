@@ -1,7 +1,11 @@
 import SocialListeningDashboard from '../SocialListeningDashboard'
 
 const Index = () => {
-  return <SocialListeningDashboard />
+  return (
+    <div className="min-h-screen">
+      <SocialListeningDashboard />
+    </div>
+  )
 }
 
 export default Index
