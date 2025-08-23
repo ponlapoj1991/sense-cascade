@@ -16,34 +16,55 @@ import { ContentView } from '@/components/Views/ContentView';
 import { Upload, FileSpreadsheet, AlertCircle, Filter, X, CheckCircle } from 'lucide-react';
 import { SocialMention } from '@/types/dashboard';
 
-// ฟังก์ชันสำหรับประมวลผลข้อมูล Excel
+// ฟังก์ชันสำหรับประมวลผลข้อมูล Excel - FIXED!
 const processExcelData = (rawData: any[]): SocialMention[] => {
   console.log('Processing Excel data:', rawData.length, 'rows');
   console.log('Sample row:', rawData[0]);
   
   return rawData.map((row, index) => {
-    // จัดการวันที่
+    // จัดการวันที่ - FIXED to handle ISO DateTime!
     let dateValue = row.date || row.Date || row.DATE || '';
     if (dateValue) {
-      if (typeof dateValue === 'string' && dateValue.includes('T')) {
-        // ISO date format
-        const parsedDate = new Date(dateValue);
-        dateValue = parsedDate.toISOString().split('T')[0];
-      } else if (typeof dateValue === 'number') {
-        // Excel serial date
-        const excelDate = new Date((dateValue - 25569) * 86400 * 1000);
-        dateValue = excelDate.toISOString().split('T')[0];
-      } else if (typeof dateValue === 'string') {
-        const parsedDate = new Date(dateValue);
-        if (!isNaN(parsedDate.getTime())) {
-          dateValue = parsedDate.toISOString().split('T')[0];
+      try {
+        let parsedDate: Date;
+        
+        if (typeof dateValue === 'string') {
+          // Handle ISO DateTime format: "2025-04-08T16:59:56.000Z"
+          if (dateValue.includes('T')) {
+            parsedDate = new Date(dateValue);
+            console.log('Parsed ISO DateTime:', dateValue, '→', parsedDate);
+          } else {
+            // Handle simple date format: "2024-01-15"
+            parsedDate = new Date(dateValue);
+            console.log('Parsed simple date:', dateValue, '→', parsedDate);
+          }
+        } else if (typeof dateValue === 'number') {
+          // Excel serial date
+          parsedDate = new Date((dateValue - 25569) * 86400 * 1000);
+          console.log('Parsed Excel serial date:', dateValue, '→', parsedDate);
+        } else if (dateValue instanceof Date) {
+          parsedDate = dateValue;
         } else {
-          dateValue = new Date().toISOString().split('T')[0];
+          // Fallback to current date if parsing fails
+          console.warn('Unknown date format:', dateValue, '→ using current date');
+          parsedDate = new Date();
         }
-      } else if (dateValue instanceof Date) {
-        dateValue = dateValue.toISOString().split('T')[0];
+        
+        // Validate parsed date
+        if (isNaN(parsedDate.getTime())) {
+          console.warn('Invalid date found:', dateValue, '→ using current date');
+          parsedDate = new Date();
+        }
+        
+        // Convert to simple date format YYYY-MM-DD
+        dateValue = parsedDate.toISOString().split('T')[0];
+        
+      } catch (error) {
+        console.error('Date parsing error:', error, 'original value:', dateValue);
+        dateValue = new Date().toISOString().split('T')[0];
       }
     } else {
+      console.warn('Empty date field → using current date');
       dateValue = new Date().toISOString().split('T')[0];
     }
 
@@ -64,12 +85,16 @@ const processExcelData = (rawData: any[]): SocialMention[] => {
       shares: parseInt(String(row.Share || row.Shares || row.shares || '0')) || 0
     };
 
-    console.log(`Processed row ${index + 1}:`, {
-      date: processedRow.date,
-      sentiment: processedRow.sentiment,
-      channel: processedRow.channel,
-      engagement: processedRow.total_engagement
-    });
+    // Debug log for first few rows
+    if (index < 3) {
+      console.log(`✅ Processed row ${index + 1}:`, {
+        originalDate: row.date,
+        processedDate: processedRow.date,
+        sentiment: processedRow.sentiment,
+        channel: processedRow.channel,
+        engagement: processedRow.total_engagement
+      });
+    }
 
     return processedRow;
   });
@@ -127,11 +152,15 @@ function FileUpload({ onDataUpload }: FileUploadProps) {
         throw new Error('ไฟล์ Excel ไม่มีข้อมูล');
       }
 
-      // Process data
+      console.log('📊 Raw Excel data loaded:', rawData.length, 'rows');
+      console.log('📊 Sample raw data:', rawData[0]);
+
+      // Process data - USING FIXED FUNCTION!
       const processedData = processExcelData(rawData);
       setUploadProgress(90);
 
-      console.log(`ประมวลผลข้อมูลเสร็จสิ้น: ${processedData.length} รายการ`);
+      console.log(`✅ ประมวลผลข้อมูลเสร็จสิ้น: ${processedData.length} รายการ`);
+      console.log('📊 Sample processed data:', processedData[0]);
       
       onDataUpload(processedData);
       setUploadProgress(100);
@@ -146,7 +175,7 @@ function FileUpload({ onDataUpload }: FileUploadProps) {
       }, 2000);
 
     } catch (err) {
-      console.error('Excel upload error:', err);
+      console.error('❌ Excel upload error:', err);
       setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการอัปโหลดไฟล์');
       setIsUploading(false);
       setUploadProgress(0);
@@ -210,7 +239,8 @@ function FileUpload({ onDataUpload }: FileUploadProps) {
           <div className="text-xs text-muted-foreground space-y-1">
             <p><strong>คอลัมน์ที่รองรับ:</strong></p>
             <p>Url, date, content, sentiment, Channel, content_type, total_engagement, username, Category, Sub_Category, type_of_speaker, Comment, Reactions, Share</p>
-            <p className="text-xs text-success">✓ รองรับชื่อคอลัมน์หลากหลายรูปแบบ</p>
+            <p className="text-xs text-success">✅ รองรับชื่อคอลัมน์หลากหลายรูปแบบ</p>
+            <p className="text-xs text-success">✅ รองรับ ISO DateTime และ Simple Date</p>
           </div>
         </div>
       </DialogContent>
@@ -223,13 +253,13 @@ function DashboardContent() {
   const [showFilters, setShowFilters] = useState(false);
 
   const handleDataUpload = (data: SocialMention[]) => {
-    console.log('อัปโหลดข้อมูลเข้าสู่ระบบ:', data.length, 'รายการ');
+    console.log('📈 อัปโหลดข้อมูลเข้าสู่ระบบ:', data.length, 'รายการ');
     dispatch({ type: 'SET_LOADING', payload: true });
     
     setTimeout(() => {
       dispatch({ type: 'SET_DATA', payload: data });
       dispatch({ type: 'SET_LOADING', payload: false });
-      console.log('ข้อมูลถูกโหลดเข้าระบบเรียบร้อย');
+      console.log('✅ ข้อมูลถูกโหลดเข้าระบบเรียบร้อย');
     }, 500);
   };
 
@@ -331,14 +361,14 @@ function DashboardContent() {
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div className="space-y-2">
-                          <p>✓ วิเคราะห์ความรู้สึกและแนวโน้ม</p>
-                          <p>✓ วัดผลประสิทธิภาพตามช่องทาง</p>
-                          <p>✓ ข้อมูลเชิงลึกจากผู้มีอิทธิพล</p>
+                          <p>✅ วิเคราะห์ความรู้สึกและแนวโน้ม</p>
+                          <p>✅ วัดผลประสิทธิภาพตามช่องทาง</p>
+                          <p>✅ ข้อมูลเชิงลึกจากผู้มีอิทธิพล</p>
                         </div>
                         <div className="space-y-2">
-                          <p>✓ วิเคราะห์ประสิทธิภาพเนื้อหา</p>
-                          <p>✓ การกรองและเจาะลึกข้อมูล</p>
-                          <p>✓ การแสดงผลแบบเรียลไทม์</p>
+                          <p>✅ วิเคราะห์ประสิทธิภาพเนื้อหา</p>
+                          <p>✅ การกรองและเจาะลึกข้อมูล</p>
+                          <p>✅ การแสดงผลแบบเรียลไทม์</p>
                         </div>
                       </div>
                     </div>
