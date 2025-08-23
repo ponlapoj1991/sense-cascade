@@ -1,4 +1,3 @@
-// src/components/AI/AIChat.tsx - IMPROVED VERSION
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,13 +6,16 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAI } from '@/contexts/AIContext';
 import { useDashboard } from '@/contexts/DashboardContext';
+import { DataProcessingService } from '@/services/dataProcessingService';
 import { 
   Bot, 
   User, 
   Send, 
   Trash2, 
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Brain,
+  BarChart3
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -33,12 +35,15 @@ const MarkdownText = ({ text }: { text: string }) => {
     // แปลง `code` เป็น <code>code</code>
     const codeText = italicText.replace(/`(.*?)`/g, '<code class="bg-muted px-1 rounded text-sm">$1</code>');
     
-    return codeText;
+    // แปลง numbers เป็นตัวหนา
+    const numberText = codeText.replace(/(\d{1,3}(?:,\d{3})*(?:\.\d+)?)/g, '<strong>$1</strong>');
+    
+    return numberText;
   };
 
   return (
     <div 
-      className="whitespace-pre-wrap"
+      className="whitespace-pre-wrap leading-relaxed"
       dangerouslySetInnerHTML={{ __html: renderText(text) }}
     />
   );
@@ -60,7 +65,7 @@ const TypingMessage = ({
       const timer = setTimeout(() => {
         setDisplayedText(prev => prev + message[currentIndex]);
         setCurrentIndex(prev => prev + 1);
-      }, 30); // 30ms per character = smooth typing
+      }, 25); // Slightly faster typing
 
       return () => clearTimeout(timer);
     } else if (currentIndex === message.length && onComplete) {
@@ -76,6 +81,7 @@ export function AIChat({ className }: AIChatProps) {
   const { state: dashboardState } = useDashboard();
   const [inputMessage, setInputMessage] = useState('');
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
+  const [isProcessingData, setIsProcessingData] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -102,31 +108,108 @@ export function AIChat({ className }: AIChatProps) {
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || aiState.isLoading) return;
 
-    // Prepare dashboard context
-    const dashboardContext = {
-      currentView: dashboardState.currentView,
-      totalItems: dashboardState.filteredData.length,
-      totalOriginalItems: dashboardState.data.length,
-      appliedFilters: {
-        dateRange: dashboardState.filters.dateRange,
-        channels: dashboardState.filters.channels,
-        sentiment: dashboardState.filters.sentiment,
-        categories: dashboardState.filters.categories,
-        contentTypes: dashboardState.filters.contentTypes,
-        speakerTypes: dashboardState.filters.speakerTypes
-      },
-      // Sample of current data (first 5 items for context)
-      sampleData: dashboardState.filteredData.slice(0, 5).map(item => ({
-        date: item.date,
-        sentiment: item.sentiment,
-        channel: item.channel,
-        content: item.content.substring(0, 100) + '...',
-        engagement: item.total_engagement
-      }))
-    };
+    setIsProcessingData(true);
+    
+    try {
+      // Process data using DataProcessingService
+      const processedContext = DataProcessingService.processDataForAI(
+        inputMessage,
+        dashboardState.data,
+        dashboardState.filters,
+        dashboardState.currentView
+      );
 
-    await sendMessage(inputMessage, dashboardContext);
-    setInputMessage('');
+      // สร้าง rich context สำหรับ AI
+      const richContext = {
+        // Basic info
+        currentView: dashboardState.currentView,
+        userQuery: inputMessage,
+        
+        // Data overview
+        dataOverview: {
+          totalOriginalItems: processedContext.totalItems,
+          filteredItems: processedContext.filteredItems,
+          queryType: processedContext.queryType.type,
+          hasContentAnalysis: processedContext.queryType.contentAnalysis
+        },
+        
+        // Calculated metrics
+        sentimentAnalysis: {
+          breakdown: processedContext.sentimentBreakdown,
+          trend: `Positive: ${processedContext.sentimentBreakdown.positive.percentage}%, Negative: ${processedContext.sentimentBreakdown.negative.percentage}%, Neutral: ${processedContext.sentimentBreakdown.neutral.percentage}%`
+        },
+        
+        channelAnalysis: {
+          breakdown: processedContext.channelBreakdown,
+          topChannels: Object.entries(processedContext.channelBreakdown)
+            .sort(([,a], [,b]) => b.count - a.count)
+            .slice(0, 3)
+            .map(([channel, stats]) => `${channel}: ${stats.count} posts (${stats.percentage}%)`)
+        },
+        
+        engagementInsights: {
+          totalEngagement: processedContext.engagementStats.total.toLocaleString(),
+          averageEngagement: processedContext.engagementStats.average.toLocaleString(),
+          medianEngagement: processedContext.engagementStats.median.toLocaleString(),
+          top10Engagement: processedContext.engagementStats.top10Total.toLocaleString()
+        },
+        
+        // Content insights (if available)
+        ...(processedContext.contentInsights && {
+          contentAnalysis: {
+            insights: processedContext.contentInsights,
+            topContent: processedContext.contentInsights.contentSamples.map(sample => ({
+              text: sample.content,
+              engagement: sample.engagement,
+              channel: sample.channel,
+              sentiment: sample.sentiment
+            }))
+          }
+        }),
+        
+        // Query results
+        queryResults: {
+          summary: processedContext.summary,
+          topResults: processedContext.topResults.slice(0, 5).map(item => ({
+            content: item.content.substring(0, 150) + (item.content.length > 150 ? '...' : ''),
+            engagement: item.total_engagement,
+            sentiment: item.sentiment,
+            channel: item.channel,
+            category: item.category,
+            username: item.username
+          }))
+        },
+        
+        // Context for AI response
+        responseInstructions: {
+          language: 'Thai',
+          includeNumbers: true,
+          includeInsights: true,
+          responseStyle: 'analytical_friendly',
+          shouldAnalyzeContent: processedContext.queryType.contentAnalysis,
+          currentDashboardView: dashboardState.currentView
+        }
+      };
+
+      console.log('🧠 Processed Context for AI:', richContext);
+
+      await sendMessage(inputMessage, richContext);
+      setInputMessage('');
+      
+    } catch (error) {
+      console.error('Data processing error:', error);
+      // Fallback to basic context
+      const basicContext = {
+        currentView: dashboardState.currentView,
+        totalItems: dashboardState.filteredData.length,
+        error: 'Could not process advanced analytics'
+      };
+      
+      await sendMessage(inputMessage, basicContext);
+      setInputMessage('');
+    } finally {
+      setIsProcessingData(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -151,6 +234,18 @@ export function AIChat({ className }: AIChatProps) {
     }
   };
 
+  const getProcessingIndicator = () => {
+    if (isProcessingData) {
+      return (
+        <div className="flex items-center text-xs text-muted-foreground mb-2">
+          <Brain className="h-3 w-3 animate-pulse mr-1" />
+          กำลังประมวลผลข้อมูล...
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className={`flex flex-col h-full max-h-screen ${className}`}>
       {/* Fixed Header */}
@@ -172,6 +267,7 @@ export function AIChat({ className }: AIChatProps) {
                 <span className="text-xs text-muted-foreground">
                   {dashboardState.filteredData.length.toLocaleString()} items
                 </span>
+                <BarChart3 className="h-3 w-3 text-muted-foreground" />
               </div>
             </div>
           </div>
@@ -201,8 +297,13 @@ export function AIChat({ className }: AIChatProps) {
                     สวัสดีครับ! ผมคือ AI ผู้ช่วยวิเคราะห์ข้อมูล
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    ถามผมเกี่ยวกับข้อมูลที่คุณกำลังดูอยู่ได้เลยครับ
+                    ถามเกี่ยวกับข้อมูล **{dashboardState.filteredData.length.toLocaleString()}** รายการที่แสดงอยู่ได้เลย
                   </p>
+                  <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                    <p>💡 ลองถาม: "วิเคราะห์ sentiment ทั้งหมด"</p>
+                    <p>💡 หรือ: "top 5 โพสต์ที่ engagement สูงสุด"</p>
+                    <p>💡 หรือ: "เนื้อหาใน Facebook เป็นยังไง"</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -258,15 +359,18 @@ export function AIChat({ className }: AIChatProps) {
             ))}
 
             {/* Loading indicator */}
-            {aiState.isLoading && (
+            {(aiState.isLoading || isProcessingData) && (
               <div className="flex items-start space-x-3">
                 <div className="p-1.5 bg-primary/10 rounded-full flex-shrink-0 mt-1">
                   <Bot className="h-3 w-3 text-primary" />
                 </div>
                 <div className="bg-muted rounded-2xl px-4 py-3">
+                  {getProcessingIndicator()}
                   <div className="flex items-center space-x-2">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    <span className="text-sm text-muted-foreground">กำลังพิมพ์...</span>
+                    <span className="text-sm text-muted-foreground">
+                      {isProcessingData ? 'กำลังวิเคราะห์ข้อมูล...' : 'กำลังพิมพ์...'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -295,11 +399,11 @@ export function AIChat({ className }: AIChatProps) {
           <div className="flex-1 relative">
             <Input
               ref={inputRef}
-              placeholder="ถามเกี่ยวกับข้อมูลที่แสดงอยู่..."
+              placeholder="วิเคราะห์ข้อมูล, หา top posts, เปรียบเทียบ channels..."
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              disabled={aiState.isLoading || !aiState.settings.apiKey}
+              disabled={aiState.isLoading || isProcessingData || !aiState.settings.apiKey}
               className="pr-12"
             />
             {!aiState.settings.apiKey && (
@@ -310,10 +414,10 @@ export function AIChat({ className }: AIChatProps) {
           </div>
           <Button
             onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || aiState.isLoading || !aiState.settings.apiKey}
+            disabled={!inputMessage.trim() || aiState.isLoading || isProcessingData || !aiState.settings.apiKey}
             size="sm"
           >
-            {aiState.isLoading ? (
+            {aiState.isLoading || isProcessingData ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-4 w-4" />
@@ -326,6 +430,39 @@ export function AIChat({ className }: AIChatProps) {
             <AlertCircle className="h-3 w-3 mr-1" />
             กรุณาใส่ OpenAI API Key ในการตั้งค่าก่อนใช้งาน
           </p>
+        )}
+
+        {/* Quick action buttons */}
+        {dashboardState.data.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-6 px-2"
+              onClick={() => setInputMessage('วิเคราะห์ sentiment ทั้งหมด')}
+              disabled={aiState.isLoading || isProcessingData}
+            >
+              Sentiment Analysis
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-6 px-2"
+              onClick={() => setInputMessage('top 10 posts ที่ engagement สูงสุด')}
+              disabled={aiState.isLoading || isProcessingData}
+            >
+              Top Posts
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-6 px-2"
+              onClick={() => setInputMessage('เปรียบเทียบ performance แต่ละ channel')}
+              disabled={aiState.isLoading || isProcessingData}
+            >
+              Compare Channels
+            </Button>
+          </div>
         )}
       </div>
     </div>
