@@ -1,7 +1,7 @@
-import DashboardWithExcel from '../DashboardWithExcel'
+import SocialListeningDashboard from '../SocialListeningDashboard'
 
 const Index = () => {
-  return <DashboardWithExcel />
+  return <SocialListeningDashboard />
 }
 
 export default Index
