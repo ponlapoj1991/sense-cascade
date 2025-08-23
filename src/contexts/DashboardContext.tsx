@@ -134,26 +134,6 @@ const DashboardContext = createContext<DashboardContextType | null>(null);
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(dashboardReducer, initialState);
 
-  // Generate unique values for filters from the data
-  const uniqueValues = state.data.reduce((acc, item) => {
-    if (item.sentiment) acc.sentiments.add(item.sentiment);
-    if (item.channel) acc.channels.add(item.channel);
-    if (item.category) acc.categories.add(item.category);
-    if (item.sub_category) acc.subCategories.add(item.sub_category);
-    if (item.content_type) acc.contentTypes.add(item.content_type);
-    if (item.type_of_speaker) acc.speakerTypes.add(item.type_of_speaker);
-    if (item.username) acc.usernames.add(item.username);
-    return acc;
-  }, {
-    sentiments: new Set<string>(),
-    channels: new Set<string>(),
-    categories: new Set<string>(),
-    subCategories: new Set<string>(),
-    contentTypes: new Set<string>(),
-    speakerTypes: new Set<string>(),
-    usernames: new Set<string>(),
-  });
-
   const addFilter = (filterType: keyof ExtendedDashboardFilters, value: string) => {
     const currentFilters = Array.isArray(state.filters[filterType]) 
       ? state.filters[filterType] as string[]
@@ -202,18 +182,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider value={{ 
-      state: {
-        ...state,
-        uniqueValues: {
-          sentiments: Array.from(uniqueValues.sentiments),
-          channels: Array.from(uniqueValues.channels),
-          categories: Array.from(uniqueValues.categories),
-          subCategories: Array.from(uniqueValues.subCategories),
-          contentTypes: Array.from(uniqueValues.contentTypes),
-          speakerTypes: Array.from(uniqueValues.speakerTypes),
-          usernames: Array.from(uniqueValues.usernames),
-        }
-      } as any, 
+      state, 
       dispatch, 
       addFilter, 
       removeFilter, 
