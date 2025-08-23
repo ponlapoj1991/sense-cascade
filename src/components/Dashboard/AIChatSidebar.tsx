@@ -7,7 +7,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { useDashboard } from '@/contexts/DashboardContext';
 
 const OPENAI_API_KEY = "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";
-const OPENAI_MODEL = "gpt-4-1106-preview";
+const OPENAI_MODEL = "gpt-4.1";
 const MAX_TOKENS = 20000;
 const TEMPERATURE = 0;
 const DEFAULT_AI_CONTEXT = 'คุณคือ AI ผู้ช่วยวิเคราะห์ข้อมูลบน Dashboard ตาม filter และข้อมูลที่เห็นขณะนี้';
