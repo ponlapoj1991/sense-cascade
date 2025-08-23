@@ -3,9 +3,12 @@ import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { DashboardProvider, useDashboard } from '@/contexts/DashboardContext';
+import { AIProvider, useAI } from '@/contexts/AIContext';
 import { Sidebar } from '@/components/Dashboard/Sidebar';
 import { FilterPanel } from '@/components/Dashboard/FilterPanel';
 import { OverviewView } from '@/components/Views/OverviewView';
@@ -13,9 +16,20 @@ import { SentimentView } from '@/components/Views/SentimentView';
 import { PerformanceView } from '@/components/Views/PerformanceView';
 import { InfluencerView } from '@/components/Views/InfluencerView';
 import { ContentView } from '@/components/Views/ContentView';
-import { Upload, FileSpreadsheet, AlertCircle, Filter, X, CheckCircle } from 'lucide-react';
+import { AIChat } from '@/components/AI/AIChat';
+import { AISettings } from '@/components/AI/AISettings';
+import { 
+  Upload, 
+  FileSpreadsheet, 
+  AlertCircle, 
+  Filter, 
+  X, 
+  CheckCircle, 
+  Settings,
+  Bot,
+  MessageSquare
+} from 'lucide-react';
 import { SocialMention } from '@/types/dashboard';
-import { AIChatSidebar } from '@/components/Dashboard/AIChatSidebar';
 
 // ฟังก์ชันสำหรับประมวลผลข้อมูล Excel - FIXED!
 const processExcelData = (rawData: any[]): SocialMention[] => {
@@ -249,10 +263,62 @@ function FileUpload({ onDataUpload }: FileUploadProps) {
   );
 }
 
+function SettingsDialog() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Settings className="h-4 w-4 mr-2" />
+          Settings
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-4xl max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle>Settings</DialogTitle>
+        </DialogHeader>
+        <Tabs defaultValue="ai" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="ai" className="flex items-center space-x-2">
+              <Bot className="h-4 w-4" />
+              <span>AI Assistant</span>
+            </TabsTrigger>
+            <TabsTrigger value="general">
+              <Settings className="h-4 w-4 mr-2" />
+              General
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="ai" className="mt-4 max-h-[60vh] overflow-y-auto">
+            <AISettings />
+          </TabsContent>
+          <TabsContent value="general" className="mt-4">
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>General Settings</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">General settings จะอยู่ที่นี่...</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DashboardContent() {
   const { state, dispatch } = useDashboard();
+  const { state: aiState, toggleChat } = useAI();
   const [showFilters, setShowFilters] = useState(false);
-  const [showAISidebar, setShowAISidebar] = useState(false);
 
   const handleDataUpload = (data: SocialMention[]) => {
     console.log('📈 อัปโหลดข้อมูลเข้าสู่ระบบ:', data.length, 'รายการ');
@@ -323,29 +389,40 @@ function DashboardContent() {
           
           <div className="flex items-center space-x-2">
             {state.data.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-                className={`relative ${hasActiveFilters() ? 'border-primary' : ''}`}
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                ตัวกรอง
-                {hasActiveFilters() && (
-                  <div className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-primary-foreground rounded-full text-xs flex items-center justify-center">
-                    •
-                  </div>
-                )}
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`relative ${hasActiveFilters() ? 'border-primary' : ''}`}
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  ตัวกรอง
+                  {hasActiveFilters() && (
+                    <div className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-primary-foreground rounded-full text-xs flex items-center justify-center">
+                      •
+                    </div>
+                  )}
+                </Button>
+                
+                <Button
+                  variant={aiState.isOpen ? "default" : "outline"}
+                  size="sm"
+                  onClick={toggleChat}
+                  className="relative"
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  AI Chat
+                  {!aiState.settings.apiKey && (
+                    <div className="absolute -top-1 -right-1 h-4 w-4 bg-warning text-warning-foreground rounded-full text-xs flex items-center justify-center">
+                      !
+                    </div>
+                  )}
+                </Button>
+              </>
             )}
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => setShowAISidebar(true)}
-              className="bg-gradient-primary text-white"
-            >
-              AI วิเคราะห์
-            </Button>
+            
+            <SettingsDialog />
             <FileUpload onDataUpload={handleDataUpload} />
           </div>
         </header>
@@ -377,7 +454,7 @@ function DashboardContent() {
                         <div className="space-y-2">
                           <p>✅ วิเคราะห์ประสิทธิภาพเนื้อหา</p>
                           <p>✅ การกรองและเจาะลึกข้อมูล</p>
-                          <p>✅ การแสดงผลแบบเรียลไทม์</p>
+                          <p>✅ AI Assistant สำหรับวิเคราะห์ 🤖</p>
                         </div>
                       </div>
                     </div>
@@ -409,8 +486,30 @@ function DashboardContent() {
               </div>
             </div>
           )}
+
           {/* AI Chat Sidebar */}
-          <AIChatSidebar open={showAISidebar} onClose={() => setShowAISidebar(false)} />
+          {aiState.isOpen && state.data.length > 0 && (
+            <div className="w-96 border-l border-border bg-card">
+              <div className="h-full flex flex-col">
+                <div className="p-4 border-b border-border flex items-center justify-between">
+                  <h2 className="font-semibold flex items-center">
+                    <Bot className="h-4 w-4 mr-2 text-primary" />
+                    AI Assistant
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleChat}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <AIChat className="h-full border-0" />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -419,8 +518,10 @@ function DashboardContent() {
 
 export default function SocialListeningDashboard() {
   return (
-    <DashboardProvider>
-      <DashboardContent />
-    </DashboardProvider>
+    <AIProvider>
+      <DashboardProvider>
+        <DashboardContent />
+      </DashboardProvider>
+    </AIProvider>
   );
 }
