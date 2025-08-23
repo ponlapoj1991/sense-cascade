@@ -28,55 +28,114 @@ function FileUploadDialog({ onDataUpload }: { onDataUpload: (data: any[]) => voi
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer);
+      const workbook = XLSX.read(arrayBuffer, {
+        cellDates: true,
+        dateNF: 'yyyy-mm-dd'
+      });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const rawData = XLSX.utils.sheet_to_json(worksheet);
+      const rawData = XLSX.utils.sheet_to_json(worksheet, {
+        raw: false,
+        dateNF: 'yyyy-mm-dd'
+      });
+
+      console.log('Raw data sample:', rawData.slice(0, 2));
 
       // Process and validate data
       const processedData = rawData.map((row: any, index: number) => {
         // Handle date conversion properly
         let dateValue = row.date || row.Date;
-        if (dateValue) {
-          // If it's already a Date object, use it; otherwise parse it
-          if (dateValue instanceof Date) {
-            dateValue = dateValue.toISOString().split('T')[0];
-          } else if (typeof dateValue === 'string') {
-            // Try to parse the date string
-            const parsedDate = new Date(dateValue);
-            if (!isNaN(parsedDate.getTime())) {
-              dateValue = parsedDate.toISOString().split('T')[0];
+        
+        console.log(`Row ${index + 1} - Raw date:`, dateValue, 'Type:', typeof dateValue);
+
+        if (dateValue !== null && dateValue !== undefined && dateValue !== '') {
+          // Handle Excel date serial number
+          if (typeof dateValue === 'number') {
+            // Excel date serial number to JS Date
+            const jsDate = new Date((dateValue - 25569) * 86400 * 1000);
+            if (!isNaN(jsDate.getTime())) {
+              dateValue = jsDate.toISOString().split('T')[0];
             } else {
               dateValue = new Date().toISOString().split('T')[0];
             }
+          }
+          // Handle string dates
+          else if (typeof dateValue === 'string') {
+            let parsedDate;
+            
+            // Try YYYY/MM/DD format first
+            if (dateValue.includes('/')) {
+              const parts = dateValue.split('/');
+              if (parts.length === 3) {
+                const year = parseInt(parts[0]);
+                const month = parseInt(parts[1]) - 1; // JS months are 0-based
+                const day = parseInt(parts[2]);
+                
+                if (year > 1900 && month >= 0 && month <= 11 && day >= 1 && day <= 31) {
+                  parsedDate = new Date(year, month, day);
+                }
+              }
+            }
+            // Try other formats
+            else {
+              parsedDate = new Date(dateValue);
+            }
+            
+            if (parsedDate && !isNaN(parsedDate.getTime())) {
+              dateValue = parsedDate.toISOString().split('T')[0];
+            } else {
+              console.warn('Invalid date format:', dateValue, 'for row:', index + 1);
+              dateValue = new Date().toISOString().split('T')[0];
+            }
+          }
+          // Handle Date objects
+          else if (dateValue instanceof Date) {
+            if (!isNaN(dateValue.getTime())) {
+              dateValue = dateValue.toISOString().split('T')[0];
+            } else {
+              dateValue = new Date().toISOString().split('T')[0];
+            }
+          }
+          else {
+            dateValue = new Date().toISOString().split('T')[0];
           }
         } else {
           dateValue = new Date().toISOString().split('T')[0];
         }
 
-        return {
+        const processedRow = {
           id: index + 1,
           date: dateValue,
           content: row.content || row.Content || '',
           sentiment: (row.sentiment || row.Sentiment || 'Neutral') as 'Positive' | 'Negative' | 'Neutral',
           channel: (row.Channel || row.channel || 'Website') as 'Facebook' | 'Website' | 'Twitter' | 'Instagram' | 'TikTok' | 'YouTube',
           content_type: (row.content_type || row['Content Type'] || row.contentType || 'Post') as 'Post' | 'Video' | 'Comment' | 'Story',
-          total_engagement: parseInt(row.total_engagement || row['Total Engagement'] || row.totalEngagement || '0'),
+          total_engagement: parseInt(row.total_engagement || row['Total Engagement'] || row.totalEngagement || '0') || 0,
           username: row.username || row.Username || row.user || '',
           category: (row.Category || row.category || 'Business Branding') as 'Business Branding' | 'ESG Branding' | 'Crisis Management',
           sub_category: (row.Sub_Category || row['Sub Category'] || row.subCategory || 'Corporate') as 'Sport' | 'Stock' | 'Net zero' | 'Corporate',
           type_of_speaker: (row.type_of_speaker || row['Type of Speaker'] || row.speakerType || 'Consumer') as 'Publisher' | 'Influencer voice' | 'Consumer' | 'Media',
-          comments: parseInt(row.Comment || row.Comments || row.comment || '0'),
-          reactions: parseInt(row.Reactions || row.reactions || row.Reaction || '0'),
-          shares: parseInt(row.Share || row.Shares || row.shares || '0')
+          comments: parseInt(row.Comment || row.Comments || row.comment || '0') || 0,
+          reactions: parseInt(row.Reactions || row.reactions || row.Reaction || '0') || 0,
+          shares: parseInt(row.Share || row.Shares || row.shares || '0') || 0
         };
+
+        return processedRow;
       });
+
+      console.log('Processed data sample:', processedData.slice(0, 2));
+      console.log('Total processed rows:', processedData.length);
+
+      if (processedData.length === 0) {
+        throw new Error('No valid data found in the Excel file');
+      }
 
       onDataUpload(processedData);
       setOpen(false);
       
     } catch (err) {
-      setError('Failed to process Excel file. Please check the format.');
+      console.error('Excel processing error:', err);
+      setError(`Failed to process Excel file: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsUploading(false);
     }
@@ -134,10 +193,12 @@ function DashboardContent() {
   const [showFilters, setShowFilters] = useState(false);
 
   const handleDataUpload = (data: any[]) => {
+    console.log('Data received in handleDataUpload:', data.length, 'rows');
     dispatch({ type: 'SET_LOADING', payload: true });
     setTimeout(() => {
       dispatch({ type: 'SET_DATA', payload: data });
       dispatch({ type: 'SET_LOADING', payload: false });
+      console.log('Data set in context');
     }, 500);
   };
 
