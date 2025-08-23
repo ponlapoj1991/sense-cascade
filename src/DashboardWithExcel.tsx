@@ -51,21 +51,22 @@ interface ExcelData {
   };
 }
 
+// เปลี่ยนทุก field เป็น lowercase ตาม header ที่ normalize
 interface SocialMediaData {
-  Url?: string;
+  url?: string;
   date?: string | Date;
   content?: string;
   sentiment?: string;
-  Channel?: string;
+  channel?: string;
   content_type?: string;
   total_engagement?: number;
   username?: string;
-  Category?: string;
-  Sub_Category?: string;
+  category?: string;
+  sub_category?: string;
   type_of_speaker?: string;
-  Comment?: number;
-  Reactions?: number;
-  Share?: number;
+  comment?: number;
+  reactions?: number;
+  share?: number;
   [key: string]: any;
 }
 
@@ -107,40 +108,41 @@ const DashboardWithExcel: React.FC = () => {
         });
 
         if (jsonData.length > 0) {
-          const sheetHeaders = (jsonData[0] as string[]).map(header => 
-            header?.toString().trim() || 'Column'
+          // Normalize header: lowercase, trim, replace space with _
+          const sheetHeaders = (jsonData[0] as string[]).map(header =>
+            header?.toString().trim().replace(/\s+/g, '_').toLowerCase() || 'column'
           );
           
           const sheetData = jsonData.slice(1).map((row: any[]) => {
             const rowObj: Record<string, any> = {};
-sheetHeaders.forEach((header, index) => {
-  let value = row[index] || '';
-  if (header.toLowerCase().includes('date') && value) {
-    if (typeof value === 'number') {
-      const utc_days = Math.floor(value - 25569);
-      const utc_value = utc_days * 86400; 
-      value = new Date(utc_value * 1000);
-    } else if (typeof value === 'string') {
-      let dateValue = new Date(value);
-      if (isNaN(dateValue.getTime()) && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
-        const [d, m, y] = value.split('/');
-        dateValue = new Date(`${y}-${m}-${d}`);
-      }
-      if (!isNaN(dateValue.getTime())) {
-        value = dateValue;
-      }
-    } else if (value instanceof Date) {
-      value = value;
-    }
-  }
-  if (['total_engagement', 'Comment', 'Reactions', 'Share'].includes(header)) {
-    const numValue = parseFloat(value);
-    if (!isNaN(numValue)) {
-      value = numValue;
-    }
-  }
-  rowObj[header] = value;
-});
+            sheetHeaders.forEach((header, index) => {
+              let value = row[index] || '';
+              if (header.includes('date') && value) {
+                if (typeof value === 'number') {
+                  const utc_days = Math.floor(value - 25569);
+                  const utc_value = utc_days * 86400; 
+                  value = new Date(utc_value * 1000);
+                } else if (typeof value === 'string') {
+                  let dateValue = new Date(value);
+                  if (isNaN(dateValue.getTime()) && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+                    const [d, m, y] = value.split('/');
+                    dateValue = new Date(`${y}-${m}-${d}`);
+                  }
+                  if (!isNaN(dateValue.getTime())) {
+                    value = dateValue;
+                  }
+                } else if (value instanceof Date) {
+                  value = value;
+                }
+              }
+              if (['total_engagement', 'comment', 'reactions', 'share'].includes(header)) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                  value = numValue;
+                }
+              }
+              rowObj[header] = value;
+            });
             return rowObj;
           });
 
@@ -227,7 +229,7 @@ sheetHeaders.forEach((header, index) => {
 
     // Sentiment Analysis
     const sentimentData = filteredData.reduce((acc: Record<string, number>, item) => {
-      const sentiment = item.sentiment || 'Unknown';
+      const sentiment = item.sentiment || 'unknown';
       acc[sentiment] = (acc[sentiment] || 0) + 1;
       return acc;
     }, {});
@@ -240,7 +242,7 @@ sheetHeaders.forEach((header, index) => {
 
     // Channel Analysis
     const channelData = filteredData.reduce((acc: Record<string, number>, item) => {
-      const channel = item.Channel || 'Unknown';
+      const channel = item.channel || 'unknown';
       acc[channel] = (acc[channel] || 0) + 1;
       return acc;
     }, {});
@@ -249,13 +251,13 @@ sheetHeaders.forEach((header, index) => {
       name,
       value: Number(value),
       engagement: filteredData
-        .filter(item => item.Channel === name)
+        .filter(item => item.channel === name)
         .reduce((sum, item) => sum + (Number(item.total_engagement) || 0), 0)
     }));
 
     // Category Analysis
     const categoryData = filteredData.reduce((acc: Record<string, number>, item) => {
-      const category = item.Category || 'Unknown';
+      const category = item.category || 'unknown';
       acc[category] = (acc[category] || 0) + 1;
       return acc;
     }, {});
@@ -369,7 +371,7 @@ sheetHeaders.forEach((header, index) => {
               <CardDescription>
                 รองรับไฟล์ .xlsx, .xls ที่มีข้อมูล Social Media Mentions
                 <br />
-                คอลัมน์ที่รองรับ: Url, date, content, sentiment, Channel, content_type, total_engagement, username, Category, Sub_Category, type_of_speaker, Comment, Reactions, Share
+                คอลัมน์ที่รองรับ: url, date, content, sentiment, channel, content_type, total_engagement, username, category, sub_category, type_of_speaker, comment, reactions, share
               </CardDescription>
             </CardHeader>
             <CardContent>
