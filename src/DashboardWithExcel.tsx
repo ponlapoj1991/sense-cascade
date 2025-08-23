@@ -113,27 +113,34 @@ const DashboardWithExcel: React.FC = () => {
           
           const sheetData = jsonData.slice(1).map((row: any[]) => {
             const rowObj: Record<string, any> = {};
-            sheetHeaders.forEach((header, index) => {
-              let value = row[index] || '';
-              
-              // Convert date strings to Date objects
-              if (header.toLowerCase().includes('date') && value) {
-                const dateValue = new Date(value);
-                if (!isNaN(dateValue.getTime())) {
-                  value = dateValue;
-                }
-              }
-              
-              // Convert numeric fields
-              if (['total_engagement', 'Comment', 'Reactions', 'Share'].includes(header)) {
-                const numValue = parseFloat(value);
-                if (!isNaN(numValue)) {
-                  value = numValue;
-                }
-              }
-              
-              rowObj[header] = value;
-            });
+sheetHeaders.forEach((header, index) => {
+  let value = row[index] || '';
+  if (header.toLowerCase().includes('date') && value) {
+    if (typeof value === 'number') {
+      const utc_days = Math.floor(value - 25569);
+      const utc_value = utc_days * 86400; 
+      value = new Date(utc_value * 1000);
+    } else if (typeof value === 'string') {
+      let dateValue = new Date(value);
+      if (isNaN(dateValue.getTime()) && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+        const [d, m, y] = value.split('/');
+        dateValue = new Date(`${y}-${m}-${d}`);
+      }
+      if (!isNaN(dateValue.getTime())) {
+        value = dateValue;
+      }
+    } else if (value instanceof Date) {
+      value = value;
+    }
+  }
+  if (['total_engagement', 'Comment', 'Reactions', 'Share'].includes(header)) {
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue)) {
+      value = numValue;
+    }
+  }
+  rowObj[header] = value;
+});
             return rowObj;
           });
 
