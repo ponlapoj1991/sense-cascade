@@ -82,7 +82,7 @@ export function AIChat({ className }: AIChatProps) {
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [aiState.messages, displayedText]);
+  }, [aiState.messages]);
 
   // Focus input when chat opens
   useEffect(() => {
