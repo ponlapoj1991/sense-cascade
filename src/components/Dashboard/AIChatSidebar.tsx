@@ -78,11 +78,13 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({ open, onClose }) =
       const data = await response.json();
       if (data.choices && data.choices[0]?.message?.content) {
         setMessages([...newMessages, { role: 'assistant', content: data.choices[0].message.content }]);
+      } else if (data.error && data.error.message) {
+        setError('API Error: ' + data.error.message);
       } else {
         setError('ไม่สามารถรับคำตอบจาก AI ได้');
       }
-    } catch {
-      setError('เกิดข้อผิดพลาดในการเชื่อมต่อ AI');
+    } catch (err: any) {
+      setError('เกิดข้อผิดพลาดในการเชื่อมต่อ AI: ' + (err?.message || 'Unknown error'));
     }
     setLoading(false);
   };
