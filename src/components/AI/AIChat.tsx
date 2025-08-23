@@ -1,4 +1,4 @@
-// src/components/AI/AIChat.tsx
+// src/components/AI/AIChat.tsx - IMPROVED VERSION
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,10 +12,7 @@ import {
   User, 
   Send, 
   Trash2, 
-  Settings, 
   Loader2,
-  X,
-  MessageSquare,
   AlertCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -24,17 +21,68 @@ interface AIChatProps {
   className?: string;
 }
 
+// Markdown renderer component
+const MarkdownText = ({ text }: { text: string }) => {
+  const renderText = (text: string) => {
+    // แปลง **text** เป็น <strong>text</strong>
+    const boldText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // แปลง *text* เป็น <em>text</em>
+    const italicText = boldText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // แปลง `code` เป็น <code>code</code>
+    const codeText = italicText.replace(/`(.*?)`/g, '<code class="bg-muted px-1 rounded text-sm">$1</code>');
+    
+    return codeText;
+  };
+
+  return (
+    <div 
+      className="whitespace-pre-wrap"
+      dangerouslySetInnerHTML={{ __html: renderText(text) }}
+    />
+  );
+};
+
+// Typing animation component
+const TypingMessage = ({ 
+  message, 
+  onComplete 
+}: { 
+  message: string; 
+  onComplete: () => void; 
+}) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (currentIndex < message.length) {
+      const timer = setTimeout(() => {
+        setDisplayedText(prev => prev + message[currentIndex]);
+        setCurrentIndex(prev => prev + 1);
+      }, 30); // 30ms per character = smooth typing
+
+      return () => clearTimeout(timer);
+    } else if (currentIndex === message.length && onComplete) {
+      onComplete();
+    }
+  }, [currentIndex, message, onComplete]);
+
+  return <MarkdownText text={displayedText} />;
+};
+
 export function AIChat({ className }: AIChatProps) {
   const { state: aiState, sendMessage, clearChat } = useAI();
   const { state: dashboardState } = useDashboard();
   const [inputMessage, setInputMessage] = useState('');
+  const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [aiState.messages]);
+  }, [aiState.messages, displayedText]);
 
   // Focus input when chat opens
   useEffect(() => {
@@ -42,6 +90,14 @@ export function AIChat({ className }: AIChatProps) {
       inputRef.current.focus();
     }
   }, []);
+
+  // เมื่อมี message ใหม่จาก AI ให้เริ่ม typing animation
+  useEffect(() => {
+    const lastMessage = aiState.messages[aiState.messages.length - 1];
+    if (lastMessage && lastMessage.role === 'assistant' && !typingMessageId) {
+      setTypingMessageId(lastMessage.id);
+    }
+  }, [aiState.messages]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || aiState.isLoading) return;
@@ -68,8 +124,6 @@ export function AIChat({ className }: AIChatProps) {
         engagement: item.total_engagement
       }))
     };
-
-    console.log('📊 Dashboard Context for AI:', dashboardContext);
 
     await sendMessage(inputMessage, dashboardContext);
     setInputMessage('');
@@ -98,16 +152,16 @@ export function AIChat({ className }: AIChatProps) {
   };
 
   return (
-    <Card className={`h-full flex flex-col ${className}`}>
-      {/* Header */}
-      <CardHeader className="pb-3 border-b">
+    <div className={`flex flex-col h-full max-h-screen ${className}`}>
+      {/* Fixed Header */}
+      <div className="flex-shrink-0 p-4 border-b bg-card">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="p-2 bg-primary/10 rounded-lg">
               <Bot className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-lg">AI Assistant</CardTitle>
+              <h3 className="font-semibold">AI Assistant</h3>
               <div className="flex items-center space-x-2 mt-1">
                 <Badge 
                   variant="outline" 
@@ -122,24 +176,22 @@ export function AIChat({ className }: AIChatProps) {
             </div>
           </div>
           
-          <div className="flex items-center space-x-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearChat}
-              disabled={aiState.messages.length === 0}
-              title="Clear chat"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearChat}
+            disabled={aiState.messages.length === 0}
+            title="Clear chat"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
-      </CardHeader>
+      </div>
 
-      {/* Messages */}
-      <CardContent className="flex-1 p-0 overflow-hidden">
-        <ScrollArea className="h-full px-4">
-          <div className="space-y-4 py-4">
+      {/* Messages - Fixed Height with Scroll */}
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full">
+          <div className="p-4 space-y-4">
             {/* Welcome message when no messages */}
             {aiState.messages.length === 0 && (
               <div className="text-center py-8">
@@ -159,25 +211,38 @@ export function AIChat({ className }: AIChatProps) {
             {aiState.messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex items-start space-x-2 ${
+                className={`flex items-start space-x-3 ${
                   message.role === 'user' ? 'justify-end' : 'justify-start'
                 }`}
               >
                 {message.role === 'assistant' && (
-                  <div className="p-1.5 bg-primary/10 rounded-full flex-shrink-0 mt-0.5">
+                  <div className="p-1.5 bg-primary/10 rounded-full flex-shrink-0 mt-1">
                     <Bot className="h-3 w-3 text-primary" />
                   </div>
                 )}
                 
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                  className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                     message.role === 'user'
                       ? 'bg-primary text-primary-foreground ml-12'
                       : 'bg-muted'
                   }`}
                 >
-                  <div className="text-sm whitespace-pre-wrap">{message.content}</div>
-                  <div className={`text-xs mt-1 ${
+                  <div className="text-sm">
+                    {message.role === 'assistant' && typingMessageId === message.id ? (
+                      <TypingMessage 
+                        message={message.content}
+                        onComplete={() => setTypingMessageId(null)}
+                      />
+                    ) : (
+                      message.role === 'assistant' ? (
+                        <MarkdownText text={message.content} />
+                      ) : (
+                        message.content
+                      )
+                    )}
+                  </div>
+                  <div className={`text-xs mt-2 ${
                     message.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
                   }`}>
                     {formatTime(message.timestamp)}
@@ -185,7 +250,7 @@ export function AIChat({ className }: AIChatProps) {
                 </div>
 
                 {message.role === 'user' && (
-                  <div className="p-1.5 bg-muted rounded-full flex-shrink-0 mt-0.5">
+                  <div className="p-1.5 bg-muted rounded-full flex-shrink-0 mt-1">
                     <User className="h-3 w-3" />
                   </div>
                 )}
@@ -194,11 +259,11 @@ export function AIChat({ className }: AIChatProps) {
 
             {/* Loading indicator */}
             {aiState.isLoading && (
-              <div className="flex items-start space-x-2">
-                <div className="p-1.5 bg-primary/10 rounded-full flex-shrink-0 mt-0.5">
+              <div className="flex items-start space-x-3">
+                <div className="p-1.5 bg-primary/10 rounded-full flex-shrink-0 mt-1">
                   <Bot className="h-3 w-3 text-primary" />
                 </div>
-                <div className="bg-muted rounded-2xl px-4 py-2">
+                <div className="bg-muted rounded-2xl px-4 py-3">
                   <div className="flex items-center space-x-2">
                     <Loader2 className="h-3 w-3 animate-spin" />
                     <span className="text-sm text-muted-foreground">กำลังพิมพ์...</span>
@@ -209,11 +274,11 @@ export function AIChat({ className }: AIChatProps) {
 
             {/* Error message */}
             {aiState.error && (
-              <div className="flex items-start space-x-2">
-                <div className="p-1.5 bg-destructive/10 rounded-full flex-shrink-0 mt-0.5">
+              <div className="flex items-start space-x-3">
+                <div className="p-1.5 bg-destructive/10 rounded-full flex-shrink-0 mt-1">
                   <AlertCircle className="h-3 w-3 text-destructive" />
                 </div>
-                <div className="bg-destructive/10 border border-destructive/20 rounded-2xl px-4 py-2 max-w-[80%]">
+                <div className="bg-destructive/10 border border-destructive/20 rounded-2xl px-4 py-3 max-w-[80%]">
                   <div className="text-sm text-destructive">{aiState.error}</div>
                 </div>
               </div>
@@ -222,10 +287,10 @@ export function AIChat({ className }: AIChatProps) {
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
-      </CardContent>
+      </div>
 
-      {/* Input */}
-      <div className="border-t p-4">
+      {/* Fixed Input */}
+      <div className="flex-shrink-0 border-t bg-card p-4">
         <div className="flex items-center space-x-2">
           <div className="flex-1 relative">
             <Input
@@ -259,10 +324,10 @@ export function AIChat({ className }: AIChatProps) {
         {!aiState.settings.apiKey && (
           <p className="text-xs text-warning mt-2 flex items-center">
             <AlertCircle className="h-3 w-3 mr-1" />
-            กรุณาใส่ OpenAI API Key ใน Settings ก่อนใช้งาน
+            กรุณาใส่ OpenAI API Key ในการตั้งค่าก่อนใช้งาน
           </p>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
