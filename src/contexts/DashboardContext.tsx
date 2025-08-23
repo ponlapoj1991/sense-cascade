@@ -1,385 +1,275 @@
-import React, { useState } from 'react';
-import * as XLSX from 'xlsx';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Progress } from '@/components/ui/progress';
-import { DashboardProvider, useDashboard } from '@/contexts/DashboardContext';
-import { Sidebar } from '@/components/Dashboard/Sidebar';
-import { FilterPanel } from '@/components/Dashboard/FilterPanel';
-import { OverviewView } from '@/components/Views/OverviewView';
-import { SentimentView } from '@/components/Views/SentimentView';
-import { PerformanceView } from '@/components/Views/PerformanceView';
-import { InfluencerView } from '@/components/Views/InfluencerView';
-import { ContentView } from '@/components/Views/ContentView';
-import { Upload, FileSpreadsheet, AlertCircle, Filter, X, CheckCircle } from 'lucide-react';
-import { SocialMention } from '@/types/dashboard';
+import React, { createContext, useContext, useReducer, ReactNode, useMemo } from 'react';
+import { SocialMention, DashboardFilters } from '@/types/dashboard';
 
-// ฟังก์ชันสำหรับประมวลผลข้อมูล Excel
-const processExcelData = (rawData: any[]): SocialMention[] => {
-  console.log('Processing Excel data:', rawData.length, 'rows');
-  console.log('Sample row:', rawData[0]);
-  
-  return rawData.map((row, index) => {
-    // จัดการวันที่
-    let dateValue = row.date || row.Date || row.DATE || '';
-    if (dateValue) {
-      if (typeof dateValue === 'string' && dateValue.includes('T')) {
-        // ISO date format
-        const parsedDate = new Date(dateValue);
-        dateValue = parsedDate.toISOString().split('T')[0];
-      } else if (typeof dateValue === 'number') {
-        // Excel serial date
-        const excelDate = new Date((dateValue - 25569) * 86400 * 1000);
-        dateValue = excelDate.toISOString().split('T')[0];
-      } else if (typeof dateValue === 'string') {
-        const parsedDate = new Date(dateValue);
-        if (!isNaN(parsedDate.getTime())) {
-          dateValue = parsedDate.toISOString().split('T')[0];
-        } else {
-          dateValue = new Date().toISOString().split('T')[0];
-        }
-      } else if (dateValue instanceof Date) {
-        dateValue = dateValue.toISOString().split('T')[0];
-      }
-    } else {
-      dateValue = new Date().toISOString().split('T')[0];
-    }
+// Extended DashboardFilters with additional fields
+export interface ExtendedDashboardFilters extends DashboardFilters {
+  subCategories: string[];
+  contentTypes: string[];
+  speakerTypes: string[];
+  usernames: string[];
+  engagementRange: {
+    min: number;
+    max: number;
+  };
+}
 
-    const processedRow = {
-      id: index + 1,
-      date: dateValue,
-      content: String(row.content || row.Content || row.CONTENT || '').trim(),
-      sentiment: (row.sentiment || row.Sentiment || row.SENTIMENT || 'Neutral') as 'Positive' | 'Negative' | 'Neutral',
-      channel: (row.Channel || row.channel || row.CHANNEL || 'Website') as any,
-      content_type: (row.content_type || row['Content Type'] || row.contentType || 'Post') as any,
-      total_engagement: parseInt(String(row.total_engagement || row['Total Engagement'] || row.totalEngagement || '0')) || 0,
-      username: String(row.username || row.Username || row.USERNAME || row.user || '').trim(),
-      category: (row.Category || row.category || row.CATEGORY || 'Business Branding') as any,
-      sub_category: (row.Sub_Category || row['Sub Category'] || row.subCategory || row.Sub_category || 'Corporate') as any,
-      type_of_speaker: (row.type_of_speaker || row['Type of Speaker'] || row.speakerType || 'Consumer') as any,
-      comments: parseInt(String(row.Comment || row.Comments || row.comment || '0')) || 0,
-      reactions: parseInt(String(row.Reactions || row.reactions || row.Reaction || '0')) || 0,
-      shares: parseInt(String(row.Share || row.Shares || row.shares || '0')) || 0
-    };
+export interface DashboardState {
+  data: SocialMention[];
+  filteredData: SocialMention[];
+  filters: ExtendedDashboardFilters;
+  currentView: 'overview' | 'sentiment' | 'performance' | 'influencer' | 'content';
+  isLoading: boolean;
+  error: string | null;
+}
 
-    console.log(`Processed row ${index + 1}:`, {
-      date: processedRow.date,
-      sentiment: processedRow.sentiment,
-      channel: processedRow.channel,
-      engagement: processedRow.total_engagement
-    });
+export type DashboardAction =
+  | { type: 'SET_DATA'; payload: SocialMention[] }
+  | { type: 'SET_FILTERS'; payload: Partial<ExtendedDashboardFilters> }
+  | { type: 'SET_VIEW'; payload: DashboardState['currentView'] }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'CLEAR_FILTERS' };
 
-    return processedRow;
-  });
+// Initial state
+const initialState: DashboardState = {
+  data: [],
+  filteredData: [],
+  filters: {
+    dateRange: {
+      start: null as any,
+      end: null as any,
+    },
+    channels: [],
+    sentiment: [],
+    categories: [],
+    timeframe: 'month',
+    subCategories: [],
+    contentTypes: [],
+    speakerTypes: [],
+    usernames: [],
+    engagementRange: {
+      min: 0,
+      max: Infinity,
+    },
+  },
+  currentView: 'overview',
+  isLoading: false,
+  error: null,
 };
 
-interface FileUploadProps {
-  onDataUpload: (data: SocialMention[]) => void;
-}
+// Efficient filtering function
+function filterData(data: SocialMention[], filters: ExtendedDashboardFilters): SocialMention[] {
+  if (data.length === 0) return [];
 
-function FileUpload({ onDataUpload }: FileUploadProps) {
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [open, setOpen] = useState(false);
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    setError(null);
-    setSuccess(false);
-    setUploadProgress(0);
-
+  return data.filter(item => {
     try {
-      // Validate file
-      if (!file.name.match(/\.(xlsx|xls)$/i)) {
-        throw new Error('กรุณาเลือกไฟล์ Excel (.xlsx หรือ .xls)');
-      }
-
-      if (file.size > 50 * 1024 * 1024) { // 50MB
-        throw new Error('ไฟล์ต้องมีขนาดไม่เกิน 50MB');
-      }
-
-      setUploadProgress(20);
-
-      // Read file
-      const arrayBuffer = await file.arrayBuffer();
-      setUploadProgress(40);
-
-      // Parse Excel
-      const workbook = XLSX.read(arrayBuffer, {
-        cellDates: true,
-        dateNF: 'yyyy-mm-dd'
-      });
-
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const rawData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-
-      setUploadProgress(70);
-
-      if (rawData.length === 0) {
-        throw new Error('ไฟล์ Excel ไม่มีข้อมูล');
-      }
-
-      // Process data
-      const processedData = processExcelData(rawData);
-      setUploadProgress(90);
-
-      console.log(`ประมวลผลข้อมูลเสร็จสิ้น: ${processedData.length} รายการ`);
-      
-      onDataUpload(processedData);
-      setUploadProgress(100);
-      setSuccess(true);
-
-      // Auto close after success
-      setTimeout(() => {
-        setOpen(false);
-        setIsUploading(false);
-        setSuccess(false);
-        setUploadProgress(0);
-      }, 2000);
-
-    } catch (err) {
-      console.error('Excel upload error:', err);
-      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการอัปโหลดไฟล์');
-      setIsUploading(false);
-      setUploadProgress(0);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-gradient-primary text-white">
-          <Upload className="h-4 w-4 mr-2" />
-          อัปโหลดข้อมูล Excel
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>อัปโหลดไฟล์ Excel</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {success && (
-            <Alert>
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>อัปโหลดข้อมูลสำเร็จ!</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
-            <FileSpreadsheet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <div className="space-y-2">
-              <p className="text-sm font-medium">เลือกไฟล์ Excel</p>
-              <p className="text-xs text-muted-foreground">
-                รองรับไฟล์ .xlsx, .xls ขนาดไม่เกิน 50MB
-              </p>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileUpload}
-                disabled={isUploading}
-                className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 disabled:opacity-50"
-              />
-            </div>
-          </div>
-
-          {isUploading && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>กำลังประมวลผล...</span>
-                <span>{uploadProgress}%</span>
-              </div>
-              <Progress value={uploadProgress} className="w-full" />
-            </div>
-          )}
-
-          <div className="text-xs text-muted-foreground space-y-1">
-            <p><strong>คอลัมน์ที่รองรับ:</strong></p>
-            <p>Url, date, content, sentiment, Channel, content_type, total_engagement, username, Category, Sub_Category, type_of_speaker, Comment, Reactions, Share</p>
-            <p className="text-xs text-success">✓ รองรับชื่อคอลัมน์หลากหลายรูปแบบ</p>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function DashboardContent() {
-  const { state, dispatch } = useDashboard();
-  const [showFilters, setShowFilters] = useState(false);
-
-  const handleDataUpload = (data: SocialMention[]) => {
-    console.log('อัปโหลดข้อมูลเข้าสู่ระบบ:', data.length, 'รายการ');
-    dispatch({ type: 'SET_LOADING', payload: true });
-    
-    setTimeout(() => {
-      dispatch({ type: 'SET_DATA', payload: data });
-      dispatch({ type: 'SET_LOADING', payload: false });
-      console.log('ข้อมูลถูกโหลดเข้าระบบเรียบร้อย');
-    }, 500);
-  };
-
-  const renderCurrentView = () => {
-    if (state.isLoading) {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p>กำลังโหลดข้อมูล...</p>
-          </div>
-        </div>
-      );
-    }
-
-    switch (state.currentView) {
-      case 'sentiment':
-        return <SentimentView />;
-      case 'performance':
-        return <PerformanceView />;
-      case 'influencer':
-        return <InfluencerView />;
-      case 'content':
-        return <ContentView />;
-      default:
-        return <OverviewView />;
-    }
-  };
-
-  const hasActiveFilters = () => {
-    const { filters } = state;
-    return (
-      filters.sentiment.length > 0 ||
-      filters.channels.length > 0 ||
-      filters.categories.length > 0 ||
-      (filters.dateRange.start && filters.dateRange.end)
-    );
-  };
-
-  return (
-    <div className="flex min-h-screen bg-background w-full">
-      {/* Sidebar */}
-      <Sidebar className="w-64 flex-shrink-0" />
-      
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="bg-card border-b border-border p-4 flex items-center justify-between sticky top-0 z-10">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-semibold bg-gradient-primary bg-clip-text text-transparent">
-              Social Listening Dashboard
-            </h1>
-            {state.data.length > 0 && (
-              <div className="text-sm text-muted-foreground">
-                {state.filteredData.length.toLocaleString()} จาก {state.data.length.toLocaleString()} รายการ
-              </div>
-            )}
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            {state.data.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-                className={`relative ${hasActiveFilters() ? 'border-primary' : ''}`}
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                ตัวกรอง
-                {hasActiveFilters() && (
-                  <div className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-primary-foreground rounded-full text-xs flex items-center justify-center">
-                    •
-                  </div>
-                )}
-              </Button>
-            )}
-            
-            <FileUpload onDataUpload={handleDataUpload} />
-          </div>
-        </header>
+      // Date filtering
+      if (filters.dateRange.start || filters.dateRange.end) {
+        const itemDate = new Date(item.date);
+        if (isNaN(itemDate.getTime())) return false;
         
-        {/* Content Area */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Main Content */}
-          <div className="flex-1 overflow-auto">
-            {state.data.length === 0 ? (
-              <div className="flex items-center justify-center h-full p-6">
-                <Card className="w-full max-w-2xl">
-                  <CardContent className="text-center space-y-6 p-8">
-                    <div className="mx-auto w-24 h-24 bg-gradient-primary rounded-full flex items-center justify-center">
-                      <FileSpreadsheet className="h-12 w-12 text-white" />
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <h2 className="text-2xl font-bold">ยินดีต้อนรับสู่ Social Listening Dashboard</h2>
-                      <p className="text-muted-foreground">
-                        อัปโหลดข้อมูล Excel เพื่อเริ่มต้นการวิเคราะห์โซเชียลมีเดีย
-                      </p>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div className="space-y-2">
-                          <p>✓ วิเคราะห์ความรู้สึกและแนวโน้ม</p>
-                          <p>✓ วัดผลประสิทธิภาพตามช่องทาง</p>
-                          <p>✓ ข้อมูลเชิงลึกจากผู้มีอิทธิพล</p>
-                        </div>
-                        <div className="space-y-2">
-                          <p>✓ วิเคราะห์ประสิทธิภาพเนื้อหา</p>
-                          <p>✓ การกรองและเจาะลึกข้อมูล</p>
-                          <p>✓ การแสดงผลแบบเรียลไทม์</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : (
-              renderCurrentView()
-            )}
-          </div>
-          
-          {/* Filter Panel */}
-          {showFilters && state.data.length > 0 && (
-            <div className="w-80 border-l border-border bg-card overflow-y-auto">
-              <div className="p-4 border-b border-border">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-semibold">ตัวกรองข้อมูล</h2>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowFilters(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="p-4">
-                <FilterPanel />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+        if (filters.dateRange.start && itemDate < filters.dateRange.start) return false;
+        if (filters.dateRange.end && itemDate > filters.dateRange.end) return false;
+      }
+
+      // Sentiment filtering
+      if (filters.sentiment.length > 0 && !filters.sentiment.includes(item.sentiment)) return false;
+
+      // Channel filtering
+      if (filters.channels.length > 0 && !filters.channels.includes(item.channel)) return false;
+
+      // Category filtering
+      if (filters.categories.length > 0 && !filters.categories.includes(item.category)) return false;
+
+      // Sub-category filtering
+      if (filters.subCategories.length > 0 && !filters.subCategories.includes(item.sub_category)) return false;
+
+      // Content type filtering
+      if (filters.contentTypes.length > 0 && !filters.contentTypes.includes(item.content_type)) return false;
+
+      // Speaker type filtering
+      if (filters.speakerTypes.length > 0 && !filters.speakerTypes.includes(item.type_of_speaker)) return false;
+
+      // Username filtering
+      if (filters.usernames.length > 0 && !filters.usernames.includes(item.username)) return false;
+
+      // Engagement range filtering
+      const engagement = item.total_engagement || 0;
+      if (engagement < filters.engagementRange.min || 
+          (filters.engagementRange.max !== Infinity && engagement > filters.engagementRange.max)) {
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Filter error:', error, item);
+      return false;
+    }
+  });
+}
+
+function dashboardReducer(state: DashboardState, action: DashboardAction): DashboardState {
+  switch (action.type) {
+    case 'SET_DATA': {
+      const newData = action.payload;
+      console.log('Setting data:', newData.length, 'items');
+      
+      // Reset engagement range based on new data
+      const engagements = newData.map(item => item.total_engagement || 0);
+      const maxEngagement = engagements.length > 0 ? Math.max(...engagements) : 1000;
+      
+      const updatedFilters = {
+        ...state.filters,
+        engagementRange: {
+          min: 0,
+          max: maxEngagement
+        }
+      };
+
+      return {
+        ...state,
+        data: newData,
+        filteredData: filterData(newData, updatedFilters),
+        filters: updatedFilters,
+        error: null
+      };
+    }
+
+    case 'SET_FILTERS': {
+      const newFilters = { ...state.filters, ...action.payload };
+      console.log('Updating filters:', newFilters);
+      
+      return {
+        ...state,
+        filters: newFilters,
+        filteredData: filterData(state.data, newFilters)
+      };
+    }
+
+    case 'CLEAR_FILTERS': {
+      const engagements = state.data.map(item => item.total_engagement || 0);
+      const maxEngagement = engagements.length > 0 ? Math.max(...engagements) : 1000;
+      
+      const clearedFilters: ExtendedDashboardFilters = {
+        dateRange: { start: null as any, end: null as any },
+        channels: [],
+        sentiment: [],
+        categories: [],
+        subCategories: [],
+        contentTypes: [],
+        speakerTypes: [],
+        usernames: [],
+        engagementRange: { min: 0, max: maxEngagement },
+        timeframe: 'month'
+      };
+
+      return {
+        ...state,
+        filters: clearedFilters,
+        filteredData: state.data
+      };
+    }
+
+    case 'SET_VIEW':
+      return { ...state, currentView: action.payload };
+
+    case 'SET_LOADING':
+      return { ...state, isLoading: action.payload };
+
+    case 'SET_ERROR':
+      return { ...state, error: action.payload };
+
+    default:
+      return state;
+  }
+}
+
+interface DashboardContextType {
+  state: DashboardState;
+  dispatch: React.Dispatch<DashboardAction>;
+  addFilter: (filterType: keyof ExtendedDashboardFilters, value: string) => void;
+  removeFilter: (filterType: keyof ExtendedDashboardFilters, value: string) => void;
+  clearFilters: () => void;
+  uniqueValues: {
+    sentiments: string[];
+    channels: string[];
+    categories: string[];
+    subCategories: string[];
+    contentTypes: string[];
+    speakerTypes: string[];
+    usernames: string[];
+  };
+}
+
+const DashboardContext = createContext<DashboardContextType | null>(null);
+
+export function DashboardProvider({ children }: { children: ReactNode }) {
+  const [state, dispatch] = useReducer(dashboardReducer, initialState);
+
+  // Memoized unique values for filter options
+  const uniqueValues = useMemo(() => {
+    const data = state.data;
+    return {
+      sentiments: [...new Set(data.map(item => item.sentiment).filter(Boolean))],
+      channels: [...new Set(data.map(item => item.channel).filter(Boolean))],
+      categories: [...new Set(data.map(item => item.category).filter(Boolean))],
+      subCategories: [...new Set(data.map(item => item.sub_category).filter(Boolean))],
+      contentTypes: [...new Set(data.map(item => item.content_type).filter(Boolean))],
+      speakerTypes: [...new Set(data.map(item => item.type_of_speaker).filter(Boolean))],
+      usernames: [...new Set(data.map(item => item.username).filter(Boolean))].slice(0, 100) // Limit for performance
+    };
+  }, [state.data]);
+
+  const addFilter = (filterType: keyof ExtendedDashboardFilters, value: string) => {
+    const currentFilters = Array.isArray(state.filters[filterType]) 
+      ? state.filters[filterType] as string[]
+      : [];
+    
+    if (!currentFilters.includes(value)) {
+      dispatch({
+        type: 'SET_FILTERS',
+        payload: {
+          [filterType]: [...currentFilters, value]
+        }
+      });
+    }
+  };
+
+  const removeFilter = (filterType: keyof ExtendedDashboardFilters, value: string) => {
+    const currentFilters = Array.isArray(state.filters[filterType]) 
+      ? state.filters[filterType] as string[]
+      : [];
+    
+    dispatch({
+      type: 'SET_FILTERS',
+      payload: {
+        [filterType]: currentFilters.filter(item => item !== value)
+      }
+    });
+  };
+
+  const clearFilters = () => {
+    dispatch({ type: 'CLEAR_FILTERS' });
+  };
+
+  return (
+    <DashboardContext.Provider value={{ 
+      state, 
+      dispatch, 
+      addFilter, 
+      removeFilter, 
+      clearFilters,
+      uniqueValues
+    }}>
+      {children}
+    </DashboardContext.Provider>
   );
 }
 
-export default function SocialListeningDashboard() {
-  return (
-    <DashboardProvider>
-      <DashboardContent />
-    </DashboardProvider>
-  );
+export function useDashboard() {
+  const context = useContext(DashboardContext);
+  if (!context) {
+    throw new Error('useDashboard must be used within a DashboardProvider');
+  }
+  return context;
 }
