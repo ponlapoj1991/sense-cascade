@@ -1,4 +1,4 @@
-// src/components/AI/AISettings.tsx
+// src/components/AI/AISettings.tsx - COMPLETE VERSION
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -197,3 +197,103 @@ export function AISettings() {
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>สั้น (100)</span>
               <span>ยาว (2000)</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Action Buttons - ส่วนที่ขาดหาย */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-md flex items-center space-x-2">
+            <Save className="h-4 w-4" />
+            <span>Actions</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {hasUnsavedChanges ? 'มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก' : 'การตั้งค่าทั้งหมดได้รับการบันทึกแล้ว'}
+            </div>
+            <div className="flex space-x-2">
+              <Button 
+                variant="outline" 
+                onClick={handleReset}
+                disabled={!hasUnsavedChanges}
+                size="sm"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                รีเซ็ต
+              </Button>
+              <Button 
+                onClick={handleSave}
+                disabled={!hasUnsavedChanges}
+                size="sm"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                บันทึก
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick Presets - เพิ่มเติมสำหรับความสะดวก */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-md flex items-center space-x-2">
+            <Bot className="h-4 w-4" />
+            <span>Quick Presets</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                handleSettingChange('systemPrompt', 'คุณเป็นผู้เชี่ยวชาญด้าน Digital Marketing และ Social Listening ที่ให้คำแนะนำเชิงกลยุทธ์ ตอบคำถามด้วยภาษาไทยอย่างเป็นมิตรและใช้ emoji เพื่อให้น่าสนใจ');
+                handleSettingChange('temperature', 0.7);
+              }}
+            >
+              🎯 Marketing Expert
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                handleSettingChange('systemPrompt', 'คุณเป็นนักวิเคราะห์ข้อมูลที่เฉพาะเจาะจงและให้คำตอบที่แม่นยำ เน้นการวิเคราะห์เชิงลึกและข้อเท็จจริง');
+                handleSettingChange('temperature', 0.3);
+              }}
+            >
+              📊 Data Analyst
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                handleSettingChange('systemPrompt', 'คุณเป็นผู้จัดการ Crisis Management ที่ช่วยจัดการสถานการณ์วิกฤตและให้คำแนะนำการตอบสนองที่เหมาะสม');
+                handleSettingChange('temperature', 0.5);
+              }}
+            >
+              🚨 Crisis Manager
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                handleSettingChange('systemPrompt', 'คุณเป็นผู้ช่วยที่เป็นกันเองและสร้างสรรค์ ตอบคำถามด้วยรูปแบบสนุกสนานและเข้าใจง่าย');
+                handleSettingChange('temperature', 0.9);
+              }}
+            >
+              🎨 Creative Assistant
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            คลิกเพื่อใช้การตั้งค่าสำเร็จรูปที่เหมาะกับงานแต่ละประเภท
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
