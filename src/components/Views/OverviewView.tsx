@@ -6,17 +6,18 @@ import { useDashboard } from '@/contexts/DashboardContext';
 import { BarChart3, TrendingUp, Users, Heart, MessageCircle, Share2 } from 'lucide-react';
 
 const SENTIMENT_COLORS = {
-  'Positive': 'hsl(var(--success))',
-  'Negative': 'hsl(var(--destructive))',
-  'Neutral': 'hsl(var(--warning))'
+  'Positive': '#22c55e',
+  'Negative': '#ef4444',
+  'Neutral': '#f59e0b'
 };
 
 const CHANNEL_COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))'
+  '#3b82f6',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
+  '#8b5cf6',
+  '#06b6d4'
 ];
 
 export function OverviewView() {
@@ -41,7 +42,7 @@ export function OverviewView() {
       name,
       value,
       percentage: Math.round((value / totalMentions) * 100),
-      color: SENTIMENT_COLORS[name as keyof typeof SENTIMENT_COLORS] || 'hsl(var(--muted-foreground))'
+      color: SENTIMENT_COLORS[name as keyof typeof SENTIMENT_COLORS] || '#6b7280'
     }));
 
     // Channel distribution
@@ -150,34 +151,45 @@ export function OverviewView() {
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <InteractivePieChart
-          title="Sentiment Distribution"
-          data={analytics.sentimentData}
-          filterKey="sentiment"
-        />
-        
-        <InteractiveBarChart
-          title="Channel Performance"
-          data={analytics.channelData}
-          filterKey="channels"
-          dataKey="value"
-        />
-        
-        <InteractiveBarChart
-          title="Top Categories"
-          data={analytics.categoryData}
-          filterKey="categories"
-          color="hsl(var(--chart-3))"
-        />
-        
-        <InteractiveBarChart
-          title="Content Types"
-          data={analytics.contentTypeData}
-          filterKey="contentTypes"
-          color="hsl(var(--chart-4))"
-        />
-      </div>
+      {analytics.sentimentData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <InteractivePieChart
+            title="Sentiment Distribution"
+            data={analytics.sentimentData}
+            filterKey="sentiment"
+          />
+          
+          <InteractiveBarChart
+            title="Channel Performance"
+            data={analytics.channelData}
+            filterKey="channels"
+            dataKey="value"
+          />
+          
+          <InteractiveBarChart
+            title="Top Categories"
+            data={analytics.categoryData}
+            filterKey="categories"
+            color="hsl(var(--chart-3))"
+          />
+          
+          <InteractiveBarChart
+            title="Content Types"
+            data={analytics.contentTypeData}
+            filterKey="contentTypes"
+            color="hsl(var(--chart-4))"
+          />
+        </div>
+      )}
+
+      {/* Empty State */}
+      {filteredData.length === 0 && (
+        <div className="text-center py-12">
+          <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">No data available</h3>
+          <p className="text-muted-foreground">Upload an Excel file to see your social media analytics</p>
+        </div>
+      )}
     </div>
   );
 }
