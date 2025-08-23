@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDashboard } from '@/contexts/DashboardContext';
+import { useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   Heart,
@@ -54,6 +55,7 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const { state, dispatch } = useDashboard();
+  const navigate = useNavigate();
   const { currentView, filteredData } = state;
 
   const getActiveFiltersCount = () => {
@@ -165,6 +167,7 @@ export function Sidebar({ className }: SidebarProps) {
           variant="outline"
           size="sm"
           className="w-full"
+          onClick={() => navigate('/setting')}
         >
           <Settings className="h-4 w-4 mr-2" />
           Settings
