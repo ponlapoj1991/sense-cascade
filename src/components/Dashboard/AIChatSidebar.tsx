@@ -6,11 +6,11 @@ import { Card } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
 import { useDashboard } from '@/contexts/DashboardContext';
 
-const OPENAI_API_KEY = "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";
+const OPENAI_API_KEY = "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";
 const OPENAI_MODEL = "gpt-4.1";
 const MAX_TOKENS = 20000;
 const TEMPERATURE = 0;
-const DEFAULT_AI_CONTEXT = 'คุณคือ AI ผู้ช่วยวิเคราะห์ข้อมูลบน Dashboard ตาม filter และข้อมูลที่เห็นขณะนี้';
+const DEFAULT_AI_CONTEXT = 'คุณคือ AI ผู้ช่วยวิเคราะห์ข้อมูลบน Dashboard ตาม filter และข้อมูลที่เห็นขณะนี้ ให้คำตอบที่กระชับตามข้อมูลที่เห็น';
 
 function getAIContextPrompt() {
   if (typeof window !== 'undefined') {
