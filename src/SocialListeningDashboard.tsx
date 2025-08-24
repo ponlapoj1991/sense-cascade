@@ -1,3 +1,4 @@
+// src/SocialListeningDashboard.tsx - Fixed version
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import { InfluencerView } from '@/components/Views/InfluencerView';
 import { ContentView } from '@/components/Views/ContentView';
 import { AIChat } from '@/components/AI/AIChat';
 import { AISettings } from '@/components/AI/AISettings';
+import { GoogleSheetsUpload } from '@/components/Dashboard/GoogleSheetsUpload';
 import { 
   Upload, 
   FileSpreadsheet, 
@@ -30,7 +32,6 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { SocialMention } from '@/types/dashboard';
-import { GoogleSheetsUpload } from '@/components/Dashboard/GoogleSheetsUpload';
 
 // ฟังก์ชันสำหรับประมวลผลข้อมูล Excel - FIXED!
 const processExcelData = (rawData: any[]): SocialMention[] => {
@@ -423,11 +424,10 @@ function DashboardContent() {
               </>
             )}
             
-            <div className="flex items-center space-x-2">
-  <SettingsDialog />
-  <FileUpload onDataUpload={handleDataUpload} />
-  <GoogleSheetsUpload onDataUpload={handleDataUpload} />
-</div>
+            <SettingsDialog />
+            <FileUpload onDataUpload={handleDataUpload} />
+            <GoogleSheetsUpload onDataUpload={handleDataUpload} />
+          </div>
         </header>
         
         {/* Content Area */}
@@ -445,7 +445,7 @@ function DashboardContent() {
                     <div className="space-y-4">
                       <h2 className="text-2xl font-bold">ยินดีต้อนรับสู่ Social Listening Dashboard</h2>
                       <p className="text-muted-foreground">
-                        อัปโหลดข้อมูล Excel เพื่อเริ่มต้นการวิเคราะห์โซเชียลมีเดีย
+                        อัปโหลดข้อมูล Excel หรือเชื่อมต่อ Google Sheets เพื่อเริ่มต้นการวิเคราะห์โซเชียลมีเดีย
                       </p>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
