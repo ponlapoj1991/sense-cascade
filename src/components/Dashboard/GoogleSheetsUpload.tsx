@@ -15,7 +15,7 @@ import { SocialMention } from '@/types/dashboard';
 const SHEET_CONFIG = {
   sheetId: '1pTvDqlnGmSKbIyg2t8dRVy08uOfe-dnji8pJNd6z0Cw',
   sheetName: 'SCGDATA',
-  gid: 0 // Usually 0 for first sheet, can be found in URL after #gid=
+  gid: 1494033773 // Usually 0 for first sheet, can be found in URL after #gid=
 };
 
 interface GoogleSheetsUploadProps {
