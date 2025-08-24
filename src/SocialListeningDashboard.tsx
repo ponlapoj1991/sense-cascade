@@ -30,6 +30,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { SocialMention } from '@/types/dashboard';
+import { GoogleSheetsUpload } from '@/components/Dashboard/GoogleSheetsUpload';
 
 // ฟังก์ชันสำหรับประมวลผลข้อมูล Excel - FIXED!
 const processExcelData = (rawData: any[]): SocialMention[] => {
@@ -423,8 +424,10 @@ function DashboardContent() {
             )}
             
             <SettingsDialog />
-            <FileUpload onDataUpload={handleDataUpload} />
-          </div>
+            <div className="flex items-center space-x-2">
+  <FileUpload onDataUpload={handleDataUpload} />
+  <GoogleSheetsUpload onDataUpload={handleDataUpload} />
+</div>
         </header>
         
         {/* Content Area */}
