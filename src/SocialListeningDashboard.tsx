@@ -423,8 +423,8 @@ function DashboardContent() {
               </>
             )}
             
-            <SettingsDialog />
             <div className="flex items-center space-x-2">
+  <SettingsDialog />
   <FileUpload onDataUpload={handleDataUpload} />
   <GoogleSheetsUpload onDataUpload={handleDataUpload} />
 </div>
